@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACNH Item Database Search</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Animal Crossing: New Horizons Item Database</h1>
+            <p class="subtitle">Search and explore all ACNH items, villagers, and more</p>
+        </header>
+
+        <div class="search-section">
+            <div class="api-key-section" id="apiKeySection">
+                <label for="apiKeyInput" class="api-key-label">Google Sheets API Key:</label>
+                <input type="password" id="apiKeyInput" placeholder="Enter your API key here">
+                <button id="saveApiKeyBtn">Save API Key</button>
+                <span id="apiKeyStatus"></span>
+            </div>
+
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Search for items, villagers, or anything...">
+                <button id="searchBtn">Search</button>
+            </div>
+
+            <div class="filters">
+                <select id="sheetSelect">
+                    <option value="">Loading sheets...</option>
+                </select>
+                <button id="loadBtn">Load Data</button>
+                <button id="clearBtn">Clear</button>
+            </div>
+
+            <div class="stats">
+                <span id="recordCount">No data loaded</span>
+            </div>
+        </div>
+
+        <div class="loading" id="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Loading data...</p>
+        </div>
+
+        <div class="results-section" id="resultsSection" style="display: none;">
+            <div class="table-container">
+                <table id="dataTable">
+                    <thead id="tableHead">
+                        <tr></tr>
+                    </thead>
+                    <tbody id="tableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <footer>
+            <p>Data source: <a href="https://docs.google.com/spreadsheets/d/13d_LAJPlxMa_DubPTuirkIV4DERBMXbrWQsmSh8ReK4/edit" target="_blank">ACNH Spreadsheet</a></p>
+            <p>This is a community-maintained database for Animal Crossing: New Horizons</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
