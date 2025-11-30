@@ -23,25 +23,73 @@
 
             <div class="search-box">
                 <input type="text" id="searchInput" placeholder="Search for items, villagers, or anything...">
-                <button id="searchBtn">Search</button>
             </div>
 
             <div class="filters">
                 <select id="sheetSelect">
                     <option value="">Loading sheets...</option>
                 </select>
-                <button id="loadBtn">Load Data</button>
-                <button id="clearBtn">Clear</button>
+
+                <select id="diyFilter">
+                    <option value="">DIY: All</option>
+                    <option value="Yes">DIY: Yes</option>
+                    <option value="No">DIY: No</option>
+                </select>
+
+                <select id="catalogFilter">
+                    <option value="">Catalog: All</option>
+                    <option value="For sale">For sale</option>
+                    <option value="Not for sale">Not for sale</option>
+                    <option value="Not in catalog">Not in catalog</option>
+                </select>
+
+                <button id="columnToggleBtn">📋 Columns</button>
             </div>
 
             <div class="stats">
                 <span id="recordCount">No data loaded</span>
+            </div>
+
+            <div class="column-toggle-panel" id="columnTogglePanel" style="display: none;">
+                <div class="column-toggle-header">
+                    <h3>Show/Hide Columns</h3>
+                    <button id="closeColumnToggle">✕</button>
+                </div>
+                <div id="columnCheckboxes"></div>
             </div>
         </div>
 
         <div class="loading" id="loading" style="display: none;">
             <div class="spinner"></div>
             <p>Loading data...</p>
+        </div>
+
+        <!-- Empty State -->
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <div class="empty-state-content">
+                <div class="empty-state-icon" id="emptyStateIcon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                </div>
+                <h2 id="emptyStateTitle">Welcome to ACNH Database!</h2>
+                <p id="emptyStateMessage">Select a sheet from the dropdown above to explore items, villagers, and more.</p>
+                <div class="empty-state-hints">
+                    <div class="hint-item">
+                        <span class="hint-icon">🔍</span>
+                        <span>Use the search bar to find items across all sheets</span>
+                    </div>
+                    <div class="hint-item">
+                        <span class="hint-icon">📋</span>
+                        <span>Click the Columns button to customize your view</span>
+                    </div>
+                    <div class="hint-item">
+                        <span class="hint-icon">📥</span>
+                        <span>Export your filtered results to CSV</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="results-section" id="resultsSection" style="display: none;">
