@@ -183,6 +183,24 @@ button {
     background: #663988;
 }
 
+#refreshBtn {
+    background: #f0f4ff;
+    color: #4a5568;
+    border: 2px solid #667eea;
+    padding: 12px 18px;
+}
+
+#refreshBtn:hover:not(:disabled) {
+    background: #e0e7ff;
+    color: #2d3748;
+    transform: translateY(-1px);
+}
+
+#refreshBtn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 /* Column toggle panel */
 .column-toggle-panel {
     background: white;

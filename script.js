@@ -2,6 +2,7 @@
 const SPREADSHEET_ID = '13d_LAJPlxMa_DubPTuirkIV4DERBMXbrWQsmSh8ReK4';
 const API_BASE_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
 const DEFAULT_API_KEY = (typeof window !== 'undefined' && window.DEFAULT_API_KEY) ? window.DEFAULT_API_KEY : ''; // Load from config if present
+const CACHE_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
 
 // State management
 let currentData = [];
@@ -18,6 +19,24 @@ let rowsPerPage = 50;
 let sortColumn = null;
 let sortDirection = 'asc';
 let currentSheet = '';
+let cacheDisabled = false; // disable caching after quota errors
+let prefetchQueue = [];
+let prefetchAbortToken = 0;
+let prefetchInFlight = 0;
+let prefetchRunning = false;
+const PREFETCH_CONCURRENCY = 2;
+const MOST_USED_SHEETS = [
+    'Housewares',
+    'Villagers',
+    'Recipes',
+    'Tools/Goods',
+    'Miscellaneous',
+    'Interior Structures',
+    'Wallpaper',
+    'Floors',
+    'Rugs',
+    'Music'
+];
 
 // Column presets per sheet type
 const COLUMN_PRESETS = {
@@ -38,6 +57,7 @@ const catalogFilter = document.getElementById('catalogFilter');
 const columnToggleBtn = document.getElementById('columnToggleBtn');
 const columnTogglePanel = document.getElementById('columnTogglePanel');
 const closeColumnToggle = document.getElementById('closeColumnToggle');
+const refreshBtn = document.getElementById('refreshBtn');
 const columnCheckboxes = document.getElementById('columnCheckboxes');
 const loading = document.getElementById('loading');
 const emptyState = document.getElementById('emptyState');
@@ -48,6 +68,11 @@ const resultsSection = document.getElementById('resultsSection');
 const tableHead = document.getElementById('tableHead');
 const tableBody = document.getElementById('tableBody');
 const recordCount = document.getElementById('recordCount');
+
+// IndexedDB for sheet caching
+const DB_NAME = 'acnhSheetCache';
+const DB_VERSION = 1;
+let dbPromise = null;
 
 // Initialize the application
 async function init() {
@@ -79,12 +104,14 @@ function hideFiltersAndControls() {
     diyFilter.style.display = 'none';
     catalogFilter.style.display = 'none';
     columnToggleBtn.style.display = 'none';
+    refreshBtn.style.display = 'none';
     recordCount.style.display = 'none';
 }
 
 // Show filters and controls
 function showFiltersAndControls() {
     columnToggleBtn.style.display = 'block';
+    refreshBtn.style.display = 'block';
     recordCount.style.display = 'block';
     // DIY and Catalog filters shown based on sheet content via updateFilterVisibility()
 }
@@ -95,12 +122,16 @@ function setupEventListeners() {
 
     // Real-time search
     searchInput.addEventListener('input', () => {
+        cancelPrefetch('search change');
         applyFilters();
     });
 
     // Auto-load on sheet selection
     sheetSelect.addEventListener('change', async () => {
         currentSheet = sheetSelect.value;
+        const hasSearch = searchInput.value.trim().length > 0;
+
+        cancelPrefetch('sheet change');
 
         if (currentSheet) {
             // Show controls when a sheet is selected
@@ -109,6 +140,7 @@ function setupEventListeners() {
                 await loadSheetData(currentSheet);
                 updateFilterVisibility();
                 await applyFilters();
+                startPrefetchQueue();
             } catch (error) {
                 console.error(`Error loading sheet ${currentSheet}:`, error);
                 showEmptyState('error');
@@ -117,7 +149,12 @@ function setupEventListeners() {
         } else {
             // Hide controls when "Select a sheet..." is chosen
             hideFiltersAndControls();
-            showEmptyState('noSheet');
+            // If there's a search term, run a global search; otherwise show no-sheet state
+            if (hasSearch) {
+                await applyFilters();
+            } else {
+                showEmptyState('noSheet');
+            }
         }
     });
 
@@ -134,11 +171,119 @@ function setupEventListeners() {
         columnTogglePanel.style.display = 'none';
     });
 
+    refreshBtn.addEventListener('click', async () => {
+        if (!currentSheet) {
+            showEmptyState('noSheet');
+            return;
+        }
+
+        refreshBtn.disabled = true;
+        await clearSheetCache(currentSheet);
+        cancelPrefetch('manual refresh');
+
+        try {
+            await loadSheetData(currentSheet, { forceRefresh: true });
+            updateFilterVisibility();
+            await applyFilters();
+        } catch (error) {
+            console.error(`Error refreshing sheet ${currentSheet}:`, error);
+            showEmptyState('error', {
+                title: `Failed to refresh ${currentSheet}`,
+                message: error.message || 'Please try again.'
+            });
+        } finally {
+            refreshBtn.disabled = false;
+        }
+    });
+
     apiKeyInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             saveApiKey();
         }
     });
+}
+
+// Cache helpers (IndexedDB)
+function getDB() {
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains('sheets')) {
+                db.createObjectStore('sheets', { keyPath: 'name' });
+            }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+    return dbPromise;
+}
+
+async function getCachedSheet(sheetName) {
+    if (cacheDisabled) return null;
+    try {
+        const db = await getDB();
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction('sheets', 'readonly');
+            const store = tx.objectStore('sheets');
+            const req = store.get(sheetName);
+            req.onsuccess = () => {
+                const row = req.result;
+                if (!row) return resolve(null);
+                const { timestamp, headers, data } = row;
+                if (!timestamp || !headers || !data) return resolve(null);
+                const isFresh = Date.now() - timestamp < CACHE_TTL_MS;
+                if (!isFresh) {
+                    clearSheetCache(sheetName).then(() => resolve(null)).catch(() => resolve(null));
+                    return;
+                }
+                resolve({ headers, data });
+            };
+            req.onerror = () => reject(req.error);
+        });
+    } catch (err) {
+        console.warn('Error reading cache for', sheetName, err);
+        cacheDisabled = true;
+        return null;
+    }
+}
+
+async function saveSheetToCache(sheetName, sheetData) {
+    if (cacheDisabled) return;
+    try {
+        const db = await getDB();
+        await new Promise((resolve, reject) => {
+            const tx = db.transaction('sheets', 'readwrite');
+            tx.oncomplete = resolve;
+            tx.onerror = () => reject(tx.error);
+            tx.objectStore('sheets').put({
+                name: sheetName,
+                timestamp: Date.now(),
+                headers: sheetData.headers,
+                data: sheetData.data
+            });
+        });
+    } catch (err) {
+        console.warn('Unable to cache sheet', sheetName, err);
+        cacheDisabled = true; // stop further cache attempts after quota errors
+        cancelPrefetch('cache quota exceeded');
+    }
+}
+
+async function clearSheetCache(sheetName) {
+    try {
+        const db = await getDB();
+        await new Promise((resolve, reject) => {
+            const tx = db.transaction('sheets', 'readwrite');
+            tx.oncomplete = resolve;
+            tx.onerror = () => reject(tx.error);
+            tx.objectStore('sheets').delete(sheetName);
+        });
+        delete allSheetsData[sheetName];
+    } catch (err) {
+        console.warn('Unable to clear cache for', sheetName, err);
+    }
 }
 
 // Load API key from localStorage
@@ -270,14 +415,24 @@ async function loadSheetData(sheetName, { forceRefresh = false, showLoading = tr
         return allSheetsData[sheetName];
     }
 
+    if (!forceRefresh) {
+        const cached = await getCachedSheet(sheetName);
+        if (cached) {
+            allSheetsData[sheetName] = cached;
+            return cached;
+        }
+    }
+
     if (sheetLoadPromises[sheetName]) {
         return sheetLoadPromises[sheetName];
     }
 
     sheetLoadPromises[sheetName] = (async () => {
         if (showLoading) {
-            showEmptyState('loading');
-            updateEmptyStateMessage(`Loading ${sheetName}...`);
+            showEmptyState('loading', {
+                title: `Loading ${sheetName}...`,
+                message: 'Fetching latest data from Google Sheets.'
+            });
         }
 
         const range = encodeURIComponent(`${sheetName}!A:ZZ`);
@@ -312,6 +467,7 @@ async function loadSheetData(sheetName, { forceRefresh = false, showLoading = tr
 
         const sheetData = { headers, data: dataRows };
         allSheetsData[sheetName] = sheetData;
+        await saveSheetToCache(sheetName, sheetData);
         return sheetData;
     })().finally(() => {
         delete sheetLoadPromises[sheetName];
@@ -322,21 +478,92 @@ async function loadSheetData(sheetName, { forceRefresh = false, showLoading = tr
 
 // Ensure all sheets are loaded when performing a cross-sheet search
 async function ensureSheetsLoadedForSearch() {
-    const missingSheets = availableSheets.filter(name => !allSheetsData[name]);
-    if (missingSheets.length === 0) return;
+    const missingSheets = [];
 
-    showEmptyState('loading');
-
-    for (let i = 0; i < missingSheets.length; i++) {
-        const sheetName = missingSheets[i];
-        const progress = i + 1;
-        const total = missingSheets.length;
-        const percentage = Math.round((progress / total) * 100);
-        updateEmptyStateMessage(`Loading sheet ${progress} of ${total} (${percentage}%)...`);
-        await loadSheetData(sheetName, { showLoading: false });
+    // Try to hydrate from cache first
+    for (const name of availableSheets) {
+        if (allSheetsData[name]) continue;
+        const cached = await getCachedSheet(name);
+        if (cached) {
+            allSheetsData[name] = cached;
+        } else {
+            missingSheets.push(name);
+        }
     }
 
-    updateEmptyStateMessage('All data loaded successfully!');
+    if (missingSheets.length === 0) return;
+
+    showEmptyState('loading', {
+        title: 'Loading sheets...',
+        message: `Batch loading ${missingSheets.length} sheet(s)...`
+    });
+
+    const chunkSize = 10;
+    let loadedCount = 0;
+    for (let i = 0; i < missingSheets.length; i += chunkSize) {
+        const chunk = missingSheets.slice(i, i + chunkSize).filter(name => !sheetLoadPromises[name]);
+        if (chunk.length === 0) continue;
+
+        const chunkPromise = fetchSheetsBatch(chunk).finally(() => {
+            chunk.forEach(name => delete sheetLoadPromises[name]);
+        });
+        chunk.forEach(name => {
+            sheetLoadPromises[name] = chunkPromise;
+        });
+
+        await chunkPromise;
+
+        loadedCount += chunk.length;
+        const percentage = Math.round((loadedCount / missingSheets.length) * 100);
+        showEmptyState('loading', {
+            title: `Loading sheets (${loadedCount}/${missingSheets.length})...`,
+            message: `${percentage}% complete`
+        });
+    }
+}
+
+// Batch-fetch multiple sheets to reduce latency
+async function fetchSheetsBatch(sheetNames) {
+    if (!sheetNames || sheetNames.length === 0) return;
+
+    // Respect Google Sheets API query limits; keep query reasonable
+    const rangesQuery = sheetNames.map(name => `ranges=${encodeURIComponent(`${name}!A:ZZ`)}`).join('&');
+    const url = `${API_BASE_URL}/${SPREADSHEET_ID}/values:batchGet?${rangesQuery}&key=${apiKey}`;
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+        if (response.status === 403) {
+            throw new Error('API key is invalid or does not have permission to access this spreadsheet.');
+        } else if (response.status === 429) {
+            throw new Error('Rate limit reached while loading data. Please try again shortly.');
+        } else {
+            throw new Error(`Failed to load sheets (Error ${response.status})`);
+        }
+    }
+
+    const data = await response.json();
+    const ranges = data.valueRanges || [];
+
+    for (const range of ranges) {
+        const sheetName = range.range.split('!')[0];
+        const rows = range.values || [];
+        const headers = rows[0] || [];
+        const dataRows = [];
+
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            const rowData = { _sheet: sheetName };
+            headers.forEach((header, index) => {
+                rowData[header] = row[index] || '';
+            });
+            dataRows.push(rowData);
+        }
+
+        const sheetData = { headers, data: dataRows };
+        allSheetsData[sheetName] = sheetData;
+        await saveSheetToCache(sheetName, sheetData);
+    }
 }
 
 // Populate column toggle checkboxes
@@ -635,8 +862,9 @@ async function applyFilters() {
         const diyValue = diyFilter.value;
         const catalogValue = catalogFilter.value;
         const hasSearch = query.length > 0;
+        const isGlobalSearch = hasSearch && !currentSheet;
 
-        if (hasSearch) {
+        if (isGlobalSearch) {
             await ensureSheetsLoadedForSearch();
         } else if (currentSheet && !allSheetsData[currentSheet]) {
             await loadSheetData(currentSheet);
@@ -657,9 +885,11 @@ async function applyFilters() {
         let combinedData = [];
         let isMultiSheet = false;
 
-        // If searching, search across ALL sheets
+        // If searching, scope to selected sheet or all sheets if none selected
         if (hasSearch) {
-            for (const sheetName of availableSheets) {
+            const targetSheets = isGlobalSearch ? availableSheets : [currentSheet];
+
+            for (const sheetName of targetSheets) {
                 const sheetData = allSheetsData[sheetName];
                 if (!sheetData || !sheetData.data) continue;
 
@@ -732,6 +962,11 @@ async function applyFilters() {
 
         displayData(currentData, isMultiSheet);
         updateRecordCount();
+
+        // If this was a global search, stop prefetch to avoid background noise
+        if (!currentSheet && hasSearch) {
+            cancelPrefetch('global search');
+        }
     } catch (error) {
         console.error('Error applying filters:', error);
         showEmptyState('error');
@@ -815,7 +1050,7 @@ function showLoading(show) {
 }
 
 // Update empty state display
-function updateEmptyState(type = 'welcome') {
+function updateEmptyState(type = 'welcome', overrides = {}) {
     const states = {
         welcome: {
             icon: `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -866,7 +1101,8 @@ function updateEmptyState(type = 'welcome') {
         }
     };
 
-    const state = states[type] || states.welcome;
+    const baseState = states[type] || states.welcome;
+    const state = { ...baseState, ...overrides };
     emptyStateIcon.innerHTML = state.icon;
     emptyStateTitle.textContent = state.title;
     emptyStateMessage.textContent = state.message;
@@ -880,8 +1116,8 @@ function updateEmptyStateMessage(message) {
 }
 
 // Show empty state
-function showEmptyState(type = 'welcome') {
-    updateEmptyState(type);
+function showEmptyState(type = 'welcome', overrides = {}) {
+    updateEmptyState(type, overrides);
     emptyState.style.display = 'block';
     resultsSection.style.display = 'none';
     loading.style.display = 'none';
@@ -948,6 +1184,66 @@ function addRetryButton() {
 // Hide empty state
 function hideEmptyState() {
     emptyState.style.display = 'none';
+    emptyState.className = 'empty-state';
+}
+
+// Prefetch queue to load additional sheets in the background
+function startPrefetchQueue() {
+    // Build queue of sheets excluding current and already loaded
+    const remaining = availableSheets.filter(name => name && name !== currentSheet && !allSheetsData[name]);
+    if (remaining.length === 0) return;
+
+    // Sort by most-used priority first, then original order
+    const priorityIndex = sheet => {
+        const idx = MOST_USED_SHEETS.indexOf(sheet);
+        return idx === -1 ? MOST_USED_SHEETS.length + 1 : idx;
+    };
+
+    remaining.sort((a, b) => {
+        const pa = priorityIndex(a);
+        const pb = priorityIndex(b);
+        if (pa === pb) return availableSheets.indexOf(a) - availableSheets.indexOf(b);
+        return pa - pb;
+    });
+
+    prefetchQueue = remaining;
+    prefetchAbortToken++;
+    prefetchInFlight = 0;
+    prefetchRunning = true;
+
+    scheduleNextPrefetch(prefetchAbortToken);
+}
+
+function cancelPrefetch(reason = '') {
+    if (prefetchRunning || prefetchInFlight > 0) {
+        console.debug('Prefetch cancelled', reason);
+    }
+    prefetchAbortToken++;
+    prefetchQueue = [];
+    prefetchInFlight = 0;
+    prefetchRunning = false;
+}
+
+function scheduleNextPrefetch(token) {
+    if (token !== prefetchAbortToken) return;
+    if (!prefetchQueue.length && prefetchInFlight === 0) {
+        prefetchRunning = false;
+        return;
+    }
+
+    // Start up to PREFETCH_CONCURRENCY
+    while (prefetchInFlight < PREFETCH_CONCURRENCY && prefetchQueue.length) {
+        const sheetName = prefetchQueue.shift();
+        prefetchInFlight++;
+
+        loadSheetData(sheetName, { showLoading: false })
+            .catch(err => console.warn('Prefetch error', sheetName, err))
+            .finally(() => {
+                prefetchInFlight--;
+                const cb = window.requestIdleCallback || function(fn) { return setTimeout(fn, 150); };
+                cb(() => scheduleNextPrefetch(token), { timeout: 1000 });
+            });
+    }
 }
 
 // Add button to show API key section again if needed
