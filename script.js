@@ -11,6 +11,7 @@ let availableSheets = []; // List of all sheet names
 let headers = [];
 let allHeaders = []; // All available headers
 let visibleColumns = []; // Currently visible column names
+let sheetLoadPromises = {}; // Track in-flight sheet fetches to avoid duplicate requests
 let apiKey = DEFAULT_API_KEY; // Default from config if available
 let currentPage = 1;
 let rowsPerPage = 50;
@@ -98,14 +99,21 @@ function setupEventListeners() {
     });
 
     // Auto-load on sheet selection
-    sheetSelect.addEventListener('change', () => {
+    sheetSelect.addEventListener('change', async () => {
         currentSheet = sheetSelect.value;
 
         if (currentSheet) {
             // Show controls when a sheet is selected
             showFiltersAndControls();
-            updateFilterVisibility();
-            applyFilters();
+            try {
+                await loadSheetData(currentSheet);
+                updateFilterVisibility();
+                await applyFilters();
+            } catch (error) {
+                console.error(`Error loading sheet ${currentSheet}:`, error);
+                showEmptyState('error');
+                updateEmptyStateMessage(error.message || 'Failed to load sheet data. Please try again.');
+            }
         } else {
             // Hide controls when "Select a sheet..." is chosen
             hideFiltersAndControls();
@@ -198,6 +206,10 @@ async function loadAvailableSheets() {
     }
 
     try {
+        // Reset loaded data for fresh session
+        allSheetsData = {};
+        sheetLoadPromises = {};
+
         // Show loading state
         showEmptyState('loading');
         updateEmptyStateMessage('Fetching spreadsheet information...');
@@ -236,14 +248,9 @@ async function loadAvailableSheets() {
             sheetSelect.appendChild(option);
         });
 
-        // Update loading message
-        updateEmptyStateMessage(`Loading data from ${availableSheets.length} sheets...`);
-
-        // Fetch data from all sheets in background with progress
-        await loadAllSheetsData();
-
-        // Enable the selector and show ready state
+        // Enable the selector and prompt user to choose a sheet
         sheetSelect.disabled = false;
+        updateEmptyStateMessage(`Found ${availableSheets.length} sheets. Select one to load.`);
         showEmptyState('noSheet');
 
     } catch (error) {
@@ -255,64 +262,80 @@ async function loadAvailableSheets() {
     }
 }
 
-// Load data from all sheets
-async function loadAllSheetsData() {
-    allSheetsData = {};
+// Load data for a single sheet (lazy-loaded)
+async function loadSheetData(sheetName, { forceRefresh = false, showLoading = true } = {}) {
+    if (!sheetName) return null;
 
-    for (let i = 0; i < availableSheets.length; i++) {
-        const sheetName = availableSheets[i];
-
-        try {
-            // Update progress indicator
-            const progress = i + 1;
-            const total = availableSheets.length;
-            const percentage = Math.round((progress / total) * 100);
-            updateEmptyStateMessage(`Loading sheet ${progress} of ${total} (${percentage}%)...`);
-
-            const range = encodeURIComponent(`${sheetName}!A:ZZ`);
-            const url = `${API_BASE_URL}/${SPREADSHEET_ID}/values/${range}?key=${apiKey}`;
-            const response = await fetch(url);
-
-            if (!response.ok) {
-                console.error(`Failed to fetch data for sheet: ${sheetName}`);
-                continue;
-            }
-
-            const data = await response.json();
-            const rows = data.values || [];
-
-            if (rows.length > 0) {
-                const headers = rows[0];
-                const dataRows = [];
-
-                for (let j = 1; j < rows.length; j++) {
-                    const row = rows[j];
-                    const rowData = { _sheet: sheetName }; // Add sheet name to each row
-
-                    headers.forEach((header, index) => {
-                        rowData[header] = row[index] || '';
-                    });
-
-                    dataRows.push(rowData);
-                }
-
-                allSheetsData[sheetName] = {
-                    headers: headers,
-                    data: dataRows
-                };
-            }
-
-            // Add delay between requests to avoid rate limiting
-            // Wait 200ms between each sheet (40 sheets = ~8 seconds total)
-            if (i < availableSheets.length - 1) {
-                await new Promise(resolve => setTimeout(resolve, 200));
-            }
-        } catch (error) {
-            console.error(`Error loading sheet ${sheetName}:`, error);
-        }
+    if (!forceRefresh && allSheetsData[sheetName]) {
+        return allSheetsData[sheetName];
     }
 
-    // Show completion message
+    if (sheetLoadPromises[sheetName]) {
+        return sheetLoadPromises[sheetName];
+    }
+
+    sheetLoadPromises[sheetName] = (async () => {
+        if (showLoading) {
+            showEmptyState('loading');
+            updateEmptyStateMessage(`Loading ${sheetName}...`);
+        }
+
+        const range = encodeURIComponent(`${sheetName}!A:ZZ`);
+        const url = `${API_BASE_URL}/${SPREADSHEET_ID}/values/${range}?key=${apiKey}`;
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            if (response.status === 403) {
+                throw new Error('API key is invalid or does not have permission to access this spreadsheet.');
+            } else if (response.status === 429) {
+                throw new Error('Rate limit reached while loading data. Please try again shortly.');
+            } else {
+                throw new Error(`Failed to load ${sheetName} (Error ${response.status})`);
+            }
+        }
+
+        const data = await response.json();
+        const rows = data.values || [];
+        const headers = rows[0] || [];
+        const dataRows = [];
+
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            const rowData = { _sheet: sheetName }; // Add sheet name to each row
+
+            headers.forEach((header, index) => {
+                rowData[header] = row[index] || '';
+            });
+
+            dataRows.push(rowData);
+        }
+
+        const sheetData = { headers, data: dataRows };
+        allSheetsData[sheetName] = sheetData;
+        return sheetData;
+    })().finally(() => {
+        delete sheetLoadPromises[sheetName];
+    });
+
+    return sheetLoadPromises[sheetName];
+}
+
+// Ensure all sheets are loaded when performing a cross-sheet search
+async function ensureSheetsLoadedForSearch() {
+    const missingSheets = availableSheets.filter(name => !allSheetsData[name]);
+    if (missingSheets.length === 0) return;
+
+    showEmptyState('loading');
+
+    for (let i = 0; i < missingSheets.length; i++) {
+        const sheetName = missingSheets[i];
+        const progress = i + 1;
+        const total = missingSheets.length;
+        const percentage = Math.round((progress / total) * 100);
+        updateEmptyStateMessage(`Loading sheet ${progress} of ${total} (${percentage}%)...`);
+        await loadSheetData(sheetName, { showLoading: false });
+    }
+
     updateEmptyStateMessage('All data loaded successfully!');
 }
 
@@ -606,103 +629,114 @@ function renderPagination(totalRecords) {
 }
 
 // Apply all filters (search + DIY + Catalog)
-function applyFilters() {
-    if (Object.keys(allSheetsData).length === 0) {
-        showEmptyState('welcome');
-        return; // No data loaded
-    }
+async function applyFilters() {
+    try {
+        const query = searchInput.value.toLowerCase().trim();
+        const diyValue = diyFilter.value;
+        const catalogValue = catalogFilter.value;
+        const hasSearch = query.length > 0;
 
-    const query = searchInput.value.toLowerCase().trim();
-    const diyValue = diyFilter.value;
-    const catalogValue = catalogFilter.value;
-    const hasSearch = query.length > 0;
+        if (hasSearch) {
+            await ensureSheetsLoadedForSearch();
+        } else if (currentSheet && !allSheetsData[currentSheet]) {
+            await loadSheetData(currentSheet);
+        }
 
-    let combinedData = [];
-    let isMultiSheet = false;
+        if (!hasSearch && (!currentSheet || !allSheetsData[currentSheet])) {
+            currentData = [];
+            allData = [];
+            showEmptyState('noSheet');
+            return;
+        }
 
-    // If searching, search across ALL sheets
-    if (hasSearch) {
-        for (const sheetName of availableSheets) {
-            const sheetData = allSheetsData[sheetName];
-            if (!sheetData || !sheetData.data) continue;
+        if (Object.keys(allSheetsData).length === 0) {
+            showEmptyState('welcome');
+            return; // No data loaded
+        }
 
-            const filteredRows = sheetData.data.filter(row => {
-                // Search filter
-                const matchesSearch = Object.values(row).some(value => {
-                    return String(value).toLowerCase().includes(query);
+        let combinedData = [];
+        let isMultiSheet = false;
+
+        // If searching, search across ALL sheets
+        if (hasSearch) {
+            for (const sheetName of availableSheets) {
+                const sheetData = allSheetsData[sheetName];
+                if (!sheetData || !sheetData.data) continue;
+
+                const filteredRows = sheetData.data.filter(row => {
+                    // Search filter
+                    const matchesSearch = Object.values(row).some(value => {
+                        return String(value).toLowerCase().includes(query);
+                    });
+                    if (!matchesSearch) return false;
+
+                    // DIY filter (only if this sheet has DIY column)
+                    if (diyValue && sheetData.headers.includes('DIY') && row['DIY'] !== diyValue) {
+                        return false;
+                    }
+
+                    // Catalog filter (only if this sheet has Catalog column)
+                    if (catalogValue && sheetData.headers.includes('Catalog') && row['Catalog'] !== catalogValue) {
+                        return false;
+                    }
+
+                    return true;
                 });
-                if (!matchesSearch) return false;
 
-                // DIY filter (only if this sheet has DIY column)
-                if (diyValue && sheetData.headers.includes('DIY') && row['DIY'] !== diyValue) {
+                combinedData = combinedData.concat(filteredRows);
+            }
+
+            // If a specific sheet is selected, filter results to only that sheet
+            if (currentSheet) {
+                combinedData = combinedData.filter(row => row._sheet === currentSheet);
+            }
+
+            // Check if results come from multiple sheets
+            const uniqueSheets = new Set(combinedData.map(row => row._sheet));
+            isMultiSheet = uniqueSheets.size > 1;
+
+            // Sort by sheet name to group results together
+            if (isMultiSheet) {
+                combinedData.sort((a, b) => {
+                    return a._sheet.localeCompare(b._sheet);
+                });
+            }
+
+        } else {
+            // No search - show data from currently selected sheet only
+            const sheetData = allSheetsData[currentSheet];
+            let filteredRows = sheetData.data.filter(row => {
+                // DIY filter
+                if (diyValue && row['DIY'] !== diyValue) {
                     return false;
                 }
 
-                // Catalog filter (only if this sheet has Catalog column)
-                if (catalogValue && sheetData.headers.includes('Catalog') && row['Catalog'] !== catalogValue) {
+                // Catalog filter
+                if (catalogValue && row['Catalog'] !== catalogValue) {
                     return false;
                 }
 
                 return true;
             });
 
-            combinedData = combinedData.concat(filteredRows);
+            combinedData = filteredRows;
+            isMultiSheet = false;
         }
 
-        // If a specific sheet is selected, filter results to only that sheet
-        if (currentSheet) {
-            combinedData = combinedData.filter(row => row._sheet === currentSheet);
-        }
+        // Set up headers and visible columns
+        setupHeadersForDisplay(isMultiSheet, combinedData);
 
-        // Check if results come from multiple sheets
-        const uniqueSheets = new Set(combinedData.map(row => row._sheet));
-        isMultiSheet = uniqueSheets.size > 1;
+        currentData = combinedData;
+        allData = combinedData;
+        currentPage = 1; // Reset to first page
 
-        // Sort by sheet name to group results together
-        if (isMultiSheet) {
-            combinedData.sort((a, b) => {
-                return a._sheet.localeCompare(b._sheet);
-            });
-        }
-
-    } else {
-        // No search - show data from currently selected sheet only
-        if (!currentSheet || !allSheetsData[currentSheet]) {
-            currentData = [];
-            allData = [];
-            // Don't update record count when no sheet is selected - it should stay hidden
-            showEmptyState('noSheet');
-            return;
-        }
-
-        const sheetData = allSheetsData[currentSheet];
-        let filteredRows = sheetData.data.filter(row => {
-            // DIY filter
-            if (diyValue && row['DIY'] !== diyValue) {
-                return false;
-            }
-
-            // Catalog filter
-            if (catalogValue && row['Catalog'] !== catalogValue) {
-                return false;
-            }
-
-            return true;
-        });
-
-        combinedData = filteredRows;
-        isMultiSheet = false;
+        displayData(currentData, isMultiSheet);
+        updateRecordCount();
+    } catch (error) {
+        console.error('Error applying filters:', error);
+        showEmptyState('error');
+        updateEmptyStateMessage(error.message || 'Failed to load data. Please try again.');
     }
-
-    // Set up headers and visible columns
-    setupHeadersForDisplay(isMultiSheet, combinedData);
-
-    currentData = combinedData;
-    allData = combinedData;
-    currentPage = 1; // Reset to first page
-
-    displayData(currentData, isMultiSheet);
-    updateRecordCount();
 }
 
 // Setup headers based on display mode
