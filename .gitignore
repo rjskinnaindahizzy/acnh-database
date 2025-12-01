@@ -1,0 +1,5 @@
+# Project files
+config/default-api-key.js
+.history/*
+.claude/*
+test-scripts/*

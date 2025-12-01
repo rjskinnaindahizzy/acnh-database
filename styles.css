@@ -341,6 +341,25 @@ button {
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: background 0.3s ease;
+}
+
+/* Error state styling */
+.empty-state.error {
+    background: linear-gradient(135deg, #ffe5e5 0%, #ffc9c9 100%);
+}
+
+.empty-state.error .empty-state-icon {
+    color: #dc3545;
+}
+
+.empty-state.error h2 {
+    color: #c82333;
+}
+
+/* Loading state styling */
+.empty-state.loading .empty-state-icon {
+    animation: none;
 }
 
 .empty-state-content {

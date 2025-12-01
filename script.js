@@ -1,7 +1,7 @@
 // ACNH Item Database Application - Google Sheets API v4
 const SPREADSHEET_ID = '13d_LAJPlxMa_DubPTuirkIV4DERBMXbrWQsmSh8ReK4';
 const API_BASE_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
-const DEFAULT_API_KEY = 'AIzaSyAeRzwH9fXnFbFYuvhG_s-6i0Nc1HhcXkk'; // Embedded API key
+const DEFAULT_API_KEY = (typeof window !== 'undefined' && window.DEFAULT_API_KEY) ? window.DEFAULT_API_KEY : ''; // Load from config if present
 
 // State management
 let currentData = [];
@@ -11,7 +11,7 @@ let availableSheets = []; // List of all sheet names
 let headers = [];
 let allHeaders = []; // All available headers
 let visibleColumns = []; // Currently visible column names
-let apiKey = DEFAULT_API_KEY; // Use embedded key by default
+let apiKey = DEFAULT_API_KEY; // Default from config if available
 let currentPage = 1;
 let rowsPerPage = 50;
 let sortColumn = null;
@@ -56,14 +56,20 @@ async function init() {
     // Hide filters, columns button, and stats initially
     hideFiltersAndControls();
 
-    // Show "no sheet selected" state immediately
-    showEmptyState('noSheet');
+    // Show loading state while we fetch sheets
+    showEmptyState('loading');
+    sheetSelect.disabled = true;
+    sheetSelect.innerHTML = '<option value="">Loading sheets...</option>';
 
     // Hide API key section since we have a default key
     if (apiKey) {
         apiKeySection.style.display = 'none';
         apiKeyInput.value = apiKey;
         await loadAvailableSheets();
+    } else {
+        // No API key - show the API key section
+        showEmptyState('noApiKey');
+        sheetSelect.innerHTML = '<option value="">Please enter API key first</option>';
     }
 }
 
@@ -134,7 +140,7 @@ function loadApiKeyFromStorage() {
         apiKey = savedKey;
         apiKeyInput.value = savedKey;
     } else {
-        // Use default embedded key
+        // Use default key from optional config file, otherwise stay empty and prompt user
         apiKey = DEFAULT_API_KEY;
         apiKeyInput.value = DEFAULT_API_KEY;
     }
@@ -187,20 +193,34 @@ async function saveApiKey() {
 async function loadAvailableSheets() {
     if (!apiKey) {
         sheetSelect.innerHTML = '<option value="">Please enter API key first</option>';
+        sheetSelect.disabled = true;
         return;
     }
 
     try {
-        // Keep empty state visible while loading in background
+        // Show loading state
+        showEmptyState('loading');
+        updateEmptyStateMessage('Fetching spreadsheet information...');
+
         const url = `${API_BASE_URL}/${SPREADSHEET_ID}?key=${apiKey}`;
         const response = await fetch(url);
 
         if (!response.ok) {
-            throw new Error('Failed to fetch spreadsheet metadata');
+            if (response.status === 403) {
+                throw new Error('API key is invalid or does not have permission to access this spreadsheet.');
+            } else if (response.status === 429) {
+                throw new Error('Too many requests. Please try again in a moment.');
+            } else {
+                throw new Error(`Failed to fetch spreadsheet (Error ${response.status})`);
+            }
         }
 
         const data = await response.json();
         const sheets = data.sheets || [];
+
+        if (sheets.length === 0) {
+            throw new Error('No sheets found in the spreadsheet.');
+        }
 
         // Store all sheet names (including Read Me)
         availableSheets = sheets.map(s => s.properties.title);
@@ -216,15 +236,22 @@ async function loadAvailableSheets() {
             sheetSelect.appendChild(option);
         });
 
-        // Fetch data from all sheets in background
+        // Update loading message
+        updateEmptyStateMessage(`Loading data from ${availableSheets.length} sheets...`);
+
+        // Fetch data from all sheets in background with progress
         await loadAllSheetsData();
 
-        // Don't auto-select a sheet - keep the empty state visible
+        // Enable the selector and show ready state
+        sheetSelect.disabled = false;
+        showEmptyState('noSheet');
 
     } catch (error) {
         console.error('Error loading sheets:', error);
         sheetSelect.innerHTML = '<option value="">Error loading sheets</option>';
-        alert('Error loading sheets. Please check your API key and try again.');
+        sheetSelect.disabled = true;
+        showEmptyState('error');
+        updateEmptyStateMessage(error.message || 'Failed to load sheets. Please check your connection and try again.');
     }
 }
 
@@ -236,6 +263,12 @@ async function loadAllSheetsData() {
         const sheetName = availableSheets[i];
 
         try {
+            // Update progress indicator
+            const progress = i + 1;
+            const total = availableSheets.length;
+            const percentage = Math.round((progress / total) * 100);
+            updateEmptyStateMessage(`Loading sheet ${progress} of ${total} (${percentage}%)...`);
+
             const range = encodeURIComponent(`${sheetName}!A:ZZ`);
             const url = `${API_BASE_URL}/${SPREADSHEET_ID}/values/${range}?key=${apiKey}`;
             const response = await fetch(url);
@@ -278,6 +311,9 @@ async function loadAllSheetsData() {
             console.error(`Error loading sheet ${sheetName}:`, error);
         }
     }
+
+    // Show completion message
+    updateEmptyStateMessage('All data loaded successfully!');
 }
 
 // Populate column toggle checkboxes
@@ -634,7 +670,7 @@ function applyFilters() {
         if (!currentSheet || !allSheetsData[currentSheet]) {
             currentData = [];
             allData = [];
-            updateRecordCount();
+            // Don't update record count when no sheet is selected - it should stay hidden
             showEmptyState('noSheet');
             return;
         }
@@ -715,8 +751,17 @@ function setupHeadersForDisplay(isMultiSheet, data) {
 
 // Update record count
 function updateRecordCount() {
+    // Don't show record count if no sheet is selected
+    if (!currentSheet) {
+        recordCount.style.display = 'none';
+        return;
+    }
+
+    // Show record count when sheet is selected
+    recordCount.style.display = 'block';
+
     if (allData.length === 0) {
-        recordCount.textContent = 'No data loaded';
+        recordCount.textContent = 'No results found';
     } else if (currentData.length === allData.length) {
         recordCount.textContent = `Showing all ${allData.length} records`;
     } else {
@@ -762,6 +807,28 @@ function updateEmptyState(type = 'welcome') {
             </svg>`,
             title: 'No Sheet Selected',
             message: 'Please select a sheet from the dropdown to view data.'
+        },
+        loading: {
+            icon: `<div class="spinner"></div>`,
+            title: 'Loading...',
+            message: 'Please wait while we fetch your data.'
+        },
+        error: {
+            icon: `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>`,
+            title: 'Error Loading Data',
+            message: 'Something went wrong. Please try again.'
+        },
+        noApiKey: {
+            icon: `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>`,
+            title: 'API Key Required',
+            message: 'Please enter your Google Sheets API key above to continue.'
         }
     };
 
@@ -771,12 +838,77 @@ function updateEmptyState(type = 'welcome') {
     emptyStateMessage.textContent = state.message;
 }
 
+// Helper function to update just the message without changing the entire state
+function updateEmptyStateMessage(message) {
+    if (emptyStateMessage) {
+        emptyStateMessage.textContent = message;
+    }
+}
+
 // Show empty state
 function showEmptyState(type = 'welcome') {
     updateEmptyState(type);
     emptyState.style.display = 'block';
     resultsSection.style.display = 'none';
     loading.style.display = 'none';
+
+    // Apply appropriate CSS class for styling
+    emptyState.className = 'empty-state';
+    if (type === 'error') {
+        emptyState.classList.add('error');
+        addRetryButton();
+    } else if (type === 'loading') {
+        emptyState.classList.add('loading');
+    }
+}
+
+// Add retry button for error states
+function addRetryButton() {
+    // Remove existing retry button if present
+    const existingBtn = document.getElementById('retryButton');
+    if (existingBtn) {
+        existingBtn.remove();
+    }
+
+    // Create retry button
+    const retryBtn = document.createElement('button');
+    retryBtn.id = 'retryButton';
+    retryBtn.textContent = '🔄 Retry';
+    retryBtn.className = 'retry-btn';
+    retryBtn.style.marginTop = '20px';
+    retryBtn.style.padding = '12px 30px';
+    retryBtn.style.fontSize = '16px';
+    retryBtn.style.fontWeight = '600';
+    retryBtn.style.border = 'none';
+    retryBtn.style.borderRadius = '10px';
+    retryBtn.style.cursor = 'pointer';
+    retryBtn.style.background = '#667eea';
+    retryBtn.style.color = 'white';
+    retryBtn.style.transition = 'all 0.3s';
+
+    retryBtn.addEventListener('click', async () => {
+        retryBtn.disabled = true;
+        retryBtn.textContent = 'Retrying...';
+        await loadAvailableSheets();
+        retryBtn.disabled = false;
+        retryBtn.textContent = '🔄 Retry';
+    });
+
+    retryBtn.addEventListener('mouseenter', () => {
+        retryBtn.style.background = '#5568d3';
+        retryBtn.style.transform = 'translateY(-2px)';
+    });
+
+    retryBtn.addEventListener('mouseleave', () => {
+        retryBtn.style.background = '#667eea';
+        retryBtn.style.transform = 'translateY(0)';
+    });
+
+    // Append to empty state content
+    const emptyStateContent = document.querySelector('.empty-state-content');
+    if (emptyStateContent) {
+        emptyStateContent.appendChild(retryBtn);
+    }
 }
 
 // Hide empty state

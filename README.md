@@ -14,39 +14,40 @@ A professional web application to search and explore data from the Animal Crossi
 
 ## Quick Start
 
-**The API key is already embedded - just open and use!**
+If your host provides `config/default-api-key.js` (see below), the site auto-loads that key. Otherwise, you’ll be prompted to enter one.
 
 1. **Open the website**: Double-click `index.html`
-
-2. **Select a sheet**:
+2. **Enter or accept the API key**:
+   - If the key is pre-configured, sheets load automatically
+   - If not, enter your Google Sheets API key when prompted
+3. **Select a sheet**:
    - The dropdown will automatically populate with all available sheets
    - Choose any sheet (Housewares, Villagers, Recipes, etc.)
-   - Click "Load Data"
-
-3. **Search**:
+4. **Search**:
    - Type anything in the search box
    - Press Enter or click Search
    - Results filter instantly!
 
-That's it! No setup required.
+### Provide a default API key (server-only)
+1. Copy `config/default-api-key.example.js` to `config/default-api-key.js`.
+2. Replace `<your-api-key-here>` with your Google Sheets API key.
+3. Keep `config/default-api-key.js` out of git (already in `.gitignore`) and only deploy it to your hosting target.
 
-### Optional: Use Your Own API Key
+### Use your own API key via the UI
+If you want to use your own Google Sheets API key (or override the default):
 
-If you want to use your own Google Sheets API key instead:
-
-1. Click the **⚙️ API Settings** button (bottom-right corner)
-2. Enter your own API key
+1. Click the **?? API Settings** button (bottom-right corner)
+2. Enter your Google Sheets API key
 3. Click "Save API Key"
 
 To get a free API key:
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project (or select an existing one)
-3. Click **APIs & Services** → **Library**
+3. Click **APIs & Services**   **Library**
 4. Search for "Google Sheets API" and click **Enable**
-5. Go to **APIs & Services** → **Credentials**
-6. Click **Create Credentials** → **API Key**
+5. Go to **APIs & Services**   **Credentials**
+6. Click **Create Credentials**   **API Key**
 7. Copy your API key
-
 ## How It Works
 
 - **Google Sheets API v4**: Uses the official Google API for reliable access
@@ -61,23 +62,18 @@ To get a free API key:
 - `index.html` - Main HTML structure with API key configuration
 - `styles.css` - Modern, responsive styling
 - `script.js` - Google Sheets API v4 integration
+- `config/default-api-key.example.js` - Template for optional default API key (copy to `config/default-api-key.js` on your host)
 - `README.md` - This file
 - `INSTRUCTIONS.md` - Detailed usage guide
 
 ## API Key Security
 
-Your API key is:
-- ✅ Stored only in your browser's localStorage
-- ✅ Never sent to any third-party servers
-- ✅ Only used to access the public ACNH spreadsheet
-- ✅ Can be changed/removed anytime via the Settings button
-
-**Security Best Practice**: Restrict your API key in Google Cloud Console:
-1. Go to **APIs & Services** → **Credentials**
-2. Click on your API key
-3. Under "API restrictions", select "Restrict key"
-4. Choose "Google Sheets API" only
-5. Optionally add HTTP referrer restrictions
+API key handling:
+- ? Default keys live in `config/default-api-key.js` on your host (git-ignored, not in the repo)
+- ? User-saved keys are stored only in your browser's localStorage
+- ? Never sent to any third-party servers
+- ? Only used to access the public ACNH spreadsheet
+- ? Can be changed/removed anytime via the Settings button
 
 ## Spreadsheet Information
 
