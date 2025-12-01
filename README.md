@@ -32,6 +32,7 @@ If your host provides `config/default-api-key.js` (see below), the site auto-loa
 1. Copy `config/default-api-key.example.js` to `config/default-api-key.js`.
 2. Replace `<your-api-key-here>` with your Google Sheets API key.
 3. Keep `config/default-api-key.js` out of git (already in `.gitignore`) and only deploy it to your hosting target.
+4. On Vercel, set env var `DEFAULT_API_KEY` and run `node scripts/generate-default-api-key.js` as (part of) your Build Command so `config/default-api-key.js` is generated during deploy.
 
 ### Use your own API key via the UI
 If you want to use your own Google Sheets API key (or override the default):
