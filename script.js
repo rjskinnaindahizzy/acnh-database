@@ -717,11 +717,38 @@ function displayData(data, isMultiSheet = false) {
                 }
 
                 // Special handling for Image column
-                const cleanValue = value ? value.trim() : '';
-                if (header === 'Image' && cleanValue && cleanValue.startsWith('http')) {
-                    const img = document.createElement('img');
-                    img.src = cleanValue;
-                    img.alt = row['Name'] || 'Image';
+                let isImage = false;
+                if (header === 'Image' && value) {
+                    const cleanValue = String(value).trim();
+                    if (cleanValue.startsWith('http')) {
+                        const img = document.createElement('img');
+                        img.src = cleanValue;
+                        img.alt = row['Name'] || 'Image';
+                        img.className = 'item-image';
+                        img.loading = 'lazy';
+                        td.appendChild(img);
+                        td.className = 'image-cell';
+                        isImage = true;
+                    }
+                }
+
+                if (!isImage) {
+                let isImage = false;
+                if (header === 'Image' && value) {
+                    const cleanValue = String(value).trim();
+                    if (cleanValue.startsWith('http')) {
+                        const img = document.createElement('img');
+                        img.src = cleanValue;
+                        img.alt = row['Name'] || 'Image';
+                        img.className = 'item-image';
+                        img.loading = 'lazy';
+                        td.appendChild(img);
+                        td.className = 'image-cell';
+                        isImage = true;
+                    }
+                }
+
+                if (!isImage) {
                     img.className = 'item-image';
                     img.loading = 'lazy';
                     td.appendChild(img);
