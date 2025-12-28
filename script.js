@@ -441,7 +441,12 @@ function resolveImageUrl(value) {
         return trimmed;
     }
 
-    const formulaMatch = trimmed.match(/IMAGE\(\s*["']?([^"')]+)["']?\s*\)/i);
+    const quotedFormulaMatch = trimmed.match(/IMAGE\(\s*(['"])(.*?)\1/i);
+    if (quotedFormulaMatch && quotedFormulaMatch[2]) {
+        return quotedFormulaMatch[2].trim();
+    }
+
+    const formulaMatch = trimmed.match(/IMAGE\(\s*([^"')\s]+)\s*\)/i);
     if (formulaMatch && formulaMatch[1]) {
         return formulaMatch[1].trim();
     }
