@@ -475,7 +475,7 @@ async function loadSheetData(sheetName, { forceRefresh = false, showLoading = tr
 
         const data = await response.json();
         const rows = data.values || [];
-        const headers = rows[0] || [];
+        const headers = (rows[0] || []).map(h => h.trim());
         const dataRows = [];
 
         for (let i = 1; i < rows.length; i++) {
@@ -572,7 +572,7 @@ async function fetchSheetsBatch(sheetNames) {
     for (const range of ranges) {
         const sheetName = range.range.split('!')[0];
         const rows = range.values || [];
-        const headers = rows[0] || [];
+        const headers = (rows[0] || []).map(h => h.trim());
         const dataRows = [];
 
         for (let i = 1; i < rows.length; i++) {
