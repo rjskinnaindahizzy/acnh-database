@@ -717,9 +717,10 @@ function displayData(data, isMultiSheet = false) {
                 }
 
                 // Special handling for Image column
-                if (header === 'Image' && value && value.startsWith('http')) {
+                const cleanValue = value ? value.trim() : '';
+                if (header === 'Image' && cleanValue && cleanValue.startsWith('http')) {
                     const img = document.createElement('img');
-                    img.src = value;
+                    img.src = cleanValue;
                     img.alt = row['Name'] || 'Image';
                     img.className = 'item-image';
                     img.loading = 'lazy';
@@ -748,9 +749,10 @@ function displayData(data, isMultiSheet = false) {
                 const value = row[header] || '';
 
                 // Special handling for Image column
-                if (header === 'Image' && value && value.startsWith('http')) {
+                const cleanValue = value ? value.trim() : '';
+                if (header === 'Image' && cleanValue && cleanValue.startsWith('http')) {
                     const img = document.createElement('img');
-                    img.src = value;
+                    img.src = cleanValue;
                     img.alt = row['Name'] || 'Image';
                     img.className = 'item-image';
                     img.loading = 'lazy';
