@@ -733,27 +733,6 @@ function displayData(data, isMultiSheet = false) {
                 }
 
                 if (!isImage) {
-                let isImage = false;
-                if (header === 'Image' && value) {
-                    const cleanValue = String(value).trim();
-                    if (cleanValue.startsWith('http')) {
-                        const img = document.createElement('img');
-                        img.src = cleanValue;
-                        img.alt = row['Name'] || 'Image';
-                        img.className = 'item-image';
-                        img.loading = 'lazy';
-                        td.appendChild(img);
-                        td.className = 'image-cell';
-                        isImage = true;
-                    }
-                }
-
-                if (!isImage) {
-                    img.className = 'item-image';
-                    img.loading = 'lazy';
-                    td.appendChild(img);
-                    td.className = 'image-cell';
-                } else {
                     td.textContent = value;
                     td.title = 'Click to expand';
 
@@ -776,16 +755,22 @@ function displayData(data, isMultiSheet = false) {
                 const value = row[header] || '';
 
                 // Special handling for Image column
-                const cleanValue = value ? value.trim() : '';
-                if (header === 'Image' && cleanValue && cleanValue.startsWith('http')) {
-                    const img = document.createElement('img');
-                    img.src = cleanValue;
-                    img.alt = row['Name'] || 'Image';
-                    img.className = 'item-image';
-                    img.loading = 'lazy';
-                    td.appendChild(img);
-                    td.className = 'image-cell';
-                } else {
+                let isImage = false;
+                if (header === 'Image' && value) {
+                    const cleanValue = String(value).trim();
+                    if (cleanValue.startsWith('http')) {
+                        const img = document.createElement('img');
+                        img.src = cleanValue;
+                        img.alt = row['Name'] || 'Image';
+                        img.className = 'item-image';
+                        img.loading = 'lazy';
+                        td.appendChild(img);
+                        td.className = 'image-cell';
+                        isImage = true;
+                    }
+                }
+
+                if (!isImage) {
                     td.textContent = value;
                     td.title = 'Click to expand';
 
