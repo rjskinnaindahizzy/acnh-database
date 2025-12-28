@@ -40,9 +40,9 @@ const MOST_USED_SHEETS = [
 
 // Column presets per sheet type
 const COLUMN_PRESETS = {
-    'Housewares': ['Name', 'Image', 'DIY', 'Buy', 'Sell', 'Color 1', 'Color 2', 'Size', 'Source', 'Catalog', 'Tag'],
-    'Villagers': ['Name', 'Image', 'Species', 'Gender', 'Personality', 'Birthday', 'Catchphrase', 'Favorite Song'],
-    'default': ['Name', 'Image'] // Fallback for unknown sheets
+    'Housewares': ['Image', 'Name', 'DIY', 'Buy', 'Sell', 'Color 1', 'Color 2', 'Size', 'Source', 'Catalog', 'Tag'],
+    'Villagers': ['Image', 'Name', 'Species', 'Gender', 'Personality', 'Birthday', 'Catchphrase', 'Favorite Song'],
+    'default': ['Image', 'Name'] // Fallback for unknown sheets
 };
 
 // DOM Elements
@@ -717,14 +717,19 @@ function displayData(data, isMultiSheet = false) {
                 }
 
                 // Special handling for Image column
-                if (header === 'Image' && value && value.startsWith('http')) {
-                    const img = document.createElement('img');
-                    img.src = value;
-                    img.alt = row['Name'] || 'Image';
-                    img.className = 'item-image';
-                    img.loading = 'lazy';
-                    td.appendChild(img);
-                    td.className = 'image-cell';
+                if (header === 'Image') {
+                    if (value && value.startsWith('http')) {
+                        const img = document.createElement('img');
+                        img.src = value;
+                        img.alt = row['Name'] || 'Image';
+                        img.className = 'item-image';
+                        img.loading = 'lazy';
+                        td.appendChild(img);
+                        td.className = 'image-cell';
+                    } else {
+                        // Empty cell for missing image
+                        td.className = 'image-cell';
+                    }
                 } else {
                     td.textContent = value;
                     td.title = 'Click to expand';
@@ -748,14 +753,19 @@ function displayData(data, isMultiSheet = false) {
                 const value = row[header] || '';
 
                 // Special handling for Image column
-                if (header === 'Image' && value && value.startsWith('http')) {
-                    const img = document.createElement('img');
-                    img.src = value;
-                    img.alt = row['Name'] || 'Image';
-                    img.className = 'item-image';
-                    img.loading = 'lazy';
-                    td.appendChild(img);
-                    td.className = 'image-cell';
+                if (header === 'Image') {
+                    if (value && value.startsWith('http')) {
+                        const img = document.createElement('img');
+                        img.src = value;
+                        img.alt = row['Name'] || 'Image';
+                        img.className = 'item-image';
+                        img.loading = 'lazy';
+                        td.appendChild(img);
+                        td.className = 'image-cell';
+                    } else {
+                        // Empty cell for missing image
+                        td.className = 'image-cell';
+                    }
                 } else {
                     td.textContent = value;
                     td.title = 'Click to expand';
@@ -1011,10 +1021,10 @@ function setupHeadersForDisplay(isMultiSheet, data) {
             });
         });
 
-        // Prioritize Name and Image, then add Sheet
+        // Prioritize Image, then Name, then Sheet
         visibleColumns = ['Sheet'];
-        if (allHeaders.has('Name')) visibleColumns.push('Name');
         if (allHeaders.has('Image')) visibleColumns.push('Image');
+        if (allHeaders.has('Name')) visibleColumns.push('Name');
 
         // Add other common columns
         const commonCols = Array.from(allHeaders).filter(h => h !== 'Name' && h !== 'Image');

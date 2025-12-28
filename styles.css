@@ -318,14 +318,19 @@ button {
 .image-cell {
     padding: 5px !important;
     text-align: center;
+    width: 80px; /* Fixed width for image column */
+    min-width: 80px;
+    vertical-align: middle;
 }
 
 .item-image {
-    max-width: 64px;
-    max-height: 64px;
+    width: 64px;
+    height: 64px;
     object-fit: contain;
     display: block;
     margin: 0 auto;
+    background-color: #fff; /* White background to see transparency */
+    border-radius: 4px; /* Slight roundness */
 }
 
 .upload-section {
