@@ -22,30 +22,33 @@
             </div>
 
             <div class="search-box">
-                <input type="text" id="searchInput" placeholder="Search for items, villagers, or anything...">
+                <div class="search-wrapper">
+                    <input type="text" id="searchInput" placeholder="Search for items, villagers, or anything... (Press /)" aria-label="Search items and villagers">
+                    <button id="searchClearBtn" class="search-clear-btn" aria-label="Clear search" style="display: none;">✕</button>
+                </div>
             </div>
 
             <div class="filters">
-                <select id="sheetSelect">
+                <select id="sheetSelect" aria-label="Select sheet">
                     <option value="">Loading sheets...</option>
                 </select>
 
-                <button id="refreshBtn" title="Reload current sheet">↻ Refresh</button>
+                <button id="refreshBtn" title="Reload current sheet" aria-label="Reload current sheet">↻ Refresh</button>
 
-                <select id="diyFilter">
+                <select id="diyFilter" aria-label="Filter by DIY status">
                     <option value="">DIY: All</option>
                     <option value="Yes">DIY: Yes</option>
                     <option value="No">DIY: No</option>
                 </select>
 
-                <select id="catalogFilter">
+                <select id="catalogFilter" aria-label="Filter by catalog status">
                     <option value="">Catalog: All</option>
                     <option value="For sale">For sale</option>
                     <option value="Not for sale">Not for sale</option>
                     <option value="Not in catalog">Not in catalog</option>
                 </select>
 
-                <button id="columnToggleBtn">📋 Columns</button>
+                <button id="columnToggleBtn" aria-label="Toggle columns">📋 Columns</button>
             </div>
 
             <div class="stats">

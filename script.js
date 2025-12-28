@@ -51,6 +51,7 @@ const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
 const apiKeyStatus = document.getElementById('apiKeyStatus');
 const apiKeySection = document.getElementById('apiKeySection');
 const searchInput = document.getElementById('searchInput');
+const searchClearBtn = document.getElementById('searchClearBtn');
 const sheetSelect = document.getElementById('sheetSelect');
 const diyFilter = document.getElementById('diyFilter');
 const catalogFilter = document.getElementById('catalogFilter');
@@ -123,7 +124,30 @@ function setupEventListeners() {
     // Real-time search
     searchInput.addEventListener('input', () => {
         cancelPrefetch('search change');
+        updateClearButton();
         applyFilters();
+    });
+
+    // Clear button functionality
+    if (searchClearBtn) {
+        searchClearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            searchInput.focus();
+            updateClearButton();
+            applyFilters();
+        });
+    }
+
+    // Keyboard shortcut '/' to focus search
+    document.addEventListener('keydown', (e) => {
+        // Check if user pressed '/' and isn't currently in an input/textarea
+        if (e.key === '/' &&
+            document.activeElement.tagName !== 'INPUT' &&
+            document.activeElement.tagName !== 'TEXTAREA') {
+
+            e.preventDefault(); // Prevent '/' from being typed if focusing
+            searchInput.focus();
+        }
     });
 
     // Auto-load on sheet selection
@@ -1315,3 +1339,13 @@ document.addEventListener('DOMContentLoaded', () => {
     settingsPara.appendChild(settingsLink);
     footer.appendChild(settingsPara);
 });
+// Show/hide clear button based on search input
+function updateClearButton() {
+    if (!searchClearBtn) return;
+
+    if (searchInput.value.trim().length > 0) {
+        searchClearBtn.style.display = 'flex';
+    } else {
+        searchClearBtn.style.display = 'none';
+    }
+}
