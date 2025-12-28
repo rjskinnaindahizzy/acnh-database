@@ -431,6 +431,24 @@ async function loadAvailableSheets() {
     }
 }
 
+function resolveImageUrl(value) {
+    if (typeof value !== 'string') return '';
+
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+
+    if (trimmed.startsWith('http')) {
+        return trimmed;
+    }
+
+    const match = trimmed.match(/^=IMAGE\(\s*(['"])(.*?)\1/i);
+    if (match && match[2]) {
+        return match[2].trim();
+    }
+
+    return '';
+}
+
 // Load data for a single sheet (lazy-loaded)
 async function loadSheetData(sheetName, { forceRefresh = false, showLoading = true } = {}) {
     if (!sheetName) return null;
@@ -460,7 +478,7 @@ async function loadSheetData(sheetName, { forceRefresh = false, showLoading = tr
         }
 
         const range = encodeURIComponent(`${sheetName}!A:ZZ`);
-        const url = `${API_BASE_URL}/${SPREADSHEET_ID}/values/${range}?key=${apiKey}`;
+        const url = `${API_BASE_URL}/${SPREADSHEET_ID}/values/${range}?key=${apiKey}&valueRenderOption=FORMULA`;
         const response = await fetch(url);
 
         if (!response.ok) {
@@ -483,7 +501,8 @@ async function loadSheetData(sheetName, { forceRefresh = false, showLoading = tr
             const rowData = { _sheet: sheetName }; // Add sheet name to each row
 
             headers.forEach((header, index) => {
-                rowData[header] = row[index] || '';
+                const value = row[index] || '';
+                rowData[header] = header === 'Image' ? resolveImageUrl(value) : value;
             });
 
             dataRows.push(rowData);
@@ -552,7 +571,7 @@ async function fetchSheetsBatch(sheetNames) {
 
     // Respect Google Sheets API query limits; keep query reasonable
     const rangesQuery = sheetNames.map(name => `ranges=${encodeURIComponent(`${name}!A:ZZ`)}`).join('&');
-    const url = `${API_BASE_URL}/${SPREADSHEET_ID}/values:batchGet?${rangesQuery}&key=${apiKey}`;
+    const url = `${API_BASE_URL}/${SPREADSHEET_ID}/values:batchGet?${rangesQuery}&key=${apiKey}&valueRenderOption=FORMULA`;
 
     const response = await fetch(url);
 
@@ -579,7 +598,8 @@ async function fetchSheetsBatch(sheetNames) {
             const row = rows[i];
             const rowData = { _sheet: sheetName };
             headers.forEach((header, index) => {
-                rowData[header] = row[index] || '';
+                const value = row[index] || '';
+                rowData[header] = header === 'Image' ? resolveImageUrl(value) : value;
             });
             dataRows.push(rowData);
         }
@@ -717,9 +737,10 @@ function displayData(data, isMultiSheet = false) {
                 }
 
                 // Special handling for Image column
-                if (header === 'Image' && value && value.startsWith('http')) {
+                const resolvedImageUrl = header === 'Image' ? resolveImageUrl(value) : '';
+                if (header === 'Image' && resolvedImageUrl) {
                     const img = document.createElement('img');
-                    img.src = value;
+                    img.src = resolvedImageUrl;
                     img.alt = row['Name'] || 'Image';
                     img.className = 'item-image';
                     img.loading = 'lazy';
@@ -748,9 +769,10 @@ function displayData(data, isMultiSheet = false) {
                 const value = row[header] || '';
 
                 // Special handling for Image column
-                if (header === 'Image' && value && value.startsWith('http')) {
+                const resolvedImageUrl = header === 'Image' ? resolveImageUrl(value) : '';
+                if (header === 'Image' && resolvedImageUrl) {
                     const img = document.createElement('img');
-                    img.src = value;
+                    img.src = resolvedImageUrl;
                     img.alt = row['Name'] || 'Image';
                     img.className = 'item-image';
                     img.loading = 'lazy';
