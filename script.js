@@ -441,7 +441,12 @@ function resolveImageUrl(value) {
         return trimmed;
     }
 
-    const formulaMatch = trimmed.match(/IMAGE\(\s*["']?([^"')]+)["']?\s*\)/i);
+    const quotedFormulaMatch = trimmed.match(/IMAGE\(\s*(['"])(.*?)\1/i);
+    if (quotedFormulaMatch && quotedFormulaMatch[2]) {
+        return quotedFormulaMatch[2].trim();
+    }
+
+    const formulaMatch = trimmed.match(/IMAGE\(\s*([^"')\s]+)\s*\)/i);
     if (formulaMatch && formulaMatch[1]) {
         return formulaMatch[1].trim();
     }
@@ -452,6 +457,23 @@ function resolveImageUrl(value) {
     }
 
     return '';
+}
+
+function isImageHeader(header) {
+    return String(header || '').trim().toLowerCase().startsWith('image');
+}
+
+function isImageFormulaValue(value) {
+    if (typeof value !== 'string') return false;
+    const trimmed = value.trim().toUpperCase();
+    return trimmed.startsWith('=IMAGE(') || trimmed.startsWith('IMAGE(');
+}
+
+function isLikelyImageUrl(value) {
+    if (typeof value !== 'string') return false;
+    const trimmed = value.trim();
+    if (!/^https?:\/\//i.test(trimmed)) return false;
+    return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(trimmed);
 }
 
 // Load data for a single sheet (lazy-loaded)
@@ -507,7 +529,8 @@ async function loadSheetData(sheetName, { forceRefresh = false, showLoading = tr
 
             headers.forEach((header, index) => {
                 const value = row[index] || '';
-                rowData[header] = header === 'Image' ? resolveImageUrl(value) : value;
+                const shouldResolveImage = isImageHeader(header) || isImageFormulaValue(value);
+                rowData[header] = shouldResolveImage ? resolveImageUrl(value) : value;
             });
 
             dataRows.push(rowData);
@@ -604,7 +627,8 @@ async function fetchSheetsBatch(sheetNames) {
             const rowData = { _sheet: sheetName };
             headers.forEach((header, index) => {
                 const value = row[index] || '';
-                rowData[header] = header === 'Image' ? resolveImageUrl(value) : value;
+                const shouldResolveImage = isImageHeader(header) || isImageFormulaValue(value);
+                rowData[header] = shouldResolveImage ? resolveImageUrl(value) : value;
             });
             dataRows.push(rowData);
         }
@@ -742,8 +766,9 @@ function displayData(data, isMultiSheet = false) {
                 }
 
                 // Special handling for Image column
-                const resolvedImageUrl = header === 'Image' ? resolveImageUrl(value) : '';
-                if (header === 'Image' && resolvedImageUrl) {
+                const shouldRenderImage = isImageHeader(header) || isImageFormulaValue(value) || isLikelyImageUrl(value);
+                const resolvedImageUrl = shouldRenderImage ? resolveImageUrl(value) : '';
+                if (shouldRenderImage && resolvedImageUrl) {
                     const img = document.createElement('img');
                     img.src = resolvedImageUrl;
                     img.alt = row['Name'] || 'Image';
@@ -774,8 +799,9 @@ function displayData(data, isMultiSheet = false) {
                 const value = row[header] || '';
 
                 // Special handling for Image column
-                const resolvedImageUrl = header === 'Image' ? resolveImageUrl(value) : '';
-                if (header === 'Image' && resolvedImageUrl) {
+                const shouldRenderImage = isImageHeader(header) || isImageFormulaValue(value) || isLikelyImageUrl(value);
+                const resolvedImageUrl = shouldRenderImage ? resolveImageUrl(value) : '';
+                if (shouldRenderImage && resolvedImageUrl) {
                     const img = document.createElement('img');
                     img.src = resolvedImageUrl;
                     img.alt = row['Name'] || 'Image';
