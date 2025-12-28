@@ -41,6 +41,7 @@ const MOST_USED_SHEETS = [
 // Column presets per sheet type
 const COLUMN_PRESETS = {
     'Housewares': ['Image', 'Name', 'DIY', 'Buy', 'Sell', 'Color 1', 'Color 2', 'Size', 'Source', 'Catalog', 'Tag'],
+    'Miscellaneous': ['Image', 'Name', 'DIY', 'Buy', 'Sell', 'Color 1', 'Color 2', 'Size', 'Source', 'Catalog', 'Tag'],
     'Villagers': ['Image', 'Name', 'Species', 'Gender', 'Personality', 'Birthday', 'Catchphrase', 'Favorite Song'],
     'default': ['Image', 'Name'] // Fallback for unknown sheets
 };
@@ -1039,7 +1040,7 @@ function setupHeadersForDisplay(isMultiSheet, data) {
         allHeaders = sheetData.headers;
 
         const preset = COLUMN_PRESETS[currentSheet] || COLUMN_PRESETS['default'];
-        visibleColumns = allHeaders.filter(h => preset.includes(h));
+        visibleColumns = preset.filter(h => allHeaders.includes(h));
 
         if (visibleColumns.length === 0) {
             visibleColumns = allHeaders.slice(0, Math.min(10, allHeaders.length));
