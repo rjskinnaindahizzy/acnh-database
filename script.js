@@ -69,6 +69,7 @@ const resultsSection = document.getElementById('resultsSection');
 const tableHead = document.getElementById('tableHead');
 const tableBody = document.getElementById('tableBody');
 const recordCount = document.getElementById('recordCount');
+const toastContainer = document.getElementById('toast-container');
 
 // IndexedDB for sheet caching
 const DB_NAME = 'acnhSheetCache';
@@ -147,6 +148,17 @@ function setupEventListeners() {
 
             e.preventDefault(); // Prevent '/' from being typed if focusing
             searchInput.focus();
+        }
+
+        // Escape to clear search
+        if (e.key === 'Escape' && document.activeElement === searchInput) {
+            if (searchInput.value) {
+                searchInput.value = '';
+                updateClearButton();
+                applyFilters();
+            } else {
+                searchInput.blur();
+            }
         }
     });
 
@@ -348,19 +360,21 @@ async function saveApiKey() {
         // API key works!
         apiKey = key;
         localStorage.setItem('googleSheetsApiKey', key);
-        apiKeyStatus.textContent = '✓ API Key Saved Successfully!';
+        showToast('API Key Saved Successfully!', 'success');
+        apiKeyStatus.textContent = '✓ Saved';
         apiKeyStatus.className = 'success';
 
         // Hide API key section
         setTimeout(() => {
             apiKeySection.style.display = 'none';
-        }, 1500);
+        }, 1000);
 
         // Load available sheets
         await loadAvailableSheets();
 
     } catch (error) {
         console.error('API key validation error:', error);
+        showToast('Invalid API key. Please check and try again.', 'error');
         apiKeyStatus.textContent = '✗ Invalid API key. Please check and try again.';
         apiKeyStatus.className = 'error';
     }
@@ -1401,4 +1415,40 @@ function updateClearButton() {
     } else {
         searchClearBtn.style.display = 'none';
     }
+}
+
+// Show toast notification
+function showToast(message, type = 'default') {
+    if (!toastContainer) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+
+    let icon = '';
+    if (type === 'success') icon = '✓';
+    else if (type === 'error') icon = '✕';
+    else icon = 'ℹ';
+
+    toast.innerHTML = `
+        <span class="toast-icon">${icon}</span>
+        <span>${message}</span>
+    `;
+
+    toastContainer.appendChild(toast);
+
+    // Trigger reflow
+    toast.offsetHeight;
+
+    // Show toast
+    setTimeout(() => {
+        toast.classList.add('show');
+    }, 10);
+
+    // Remove toast after delay
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => {
+            toast.remove();
+        }, 300);
+    }, 4000);
 }
