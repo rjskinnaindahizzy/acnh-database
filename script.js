@@ -349,6 +349,11 @@ async function saveApiKey() {
     apiKeyStatus.textContent = 'Testing API key...';
     apiKeyStatus.className = '';
 
+    // UX: Loading state
+    const originalBtnContent = saveApiKeyBtn.innerHTML;
+    saveApiKeyBtn.disabled = true;
+    saveApiKeyBtn.innerHTML = '<span class="btn-spinner"></span> Saving...';
+
     try {
         const testUrl = `${API_BASE_URL}/${SPREADSHEET_ID}?key=${key}`;
         const response = await fetch(testUrl);
@@ -377,6 +382,9 @@ async function saveApiKey() {
         showToast('Invalid API key. Please check and try again.', 'error');
         apiKeyStatus.textContent = '✗ Invalid API key. Please check and try again.';
         apiKeyStatus.className = 'error';
+    } finally {
+        saveApiKeyBtn.disabled = false;
+        saveApiKeyBtn.innerHTML = originalBtnContent;
     }
 }
 
