@@ -24,6 +24,7 @@ let prefetchQueue = [];
 let prefetchAbortToken = 0;
 let prefetchInFlight = 0;
 let prefetchRunning = false;
+let shouldFocusSort = false; // Flag to restore focus to sort header
 const PREFETCH_CONCURRENCY = 2;
 const MOST_USED_SHEETS = [
     'Housewares',
@@ -732,23 +733,51 @@ function displayData(data, isMultiSheet = false) {
     // Create table headers with sorting
     tableHead.innerHTML = '';
     const headerRow = document.createElement('tr');
+
+    // Track element to focus after render
+    let elementToFocus = null;
+
     headers.forEach(header => {
         const th = document.createElement('th');
         th.textContent = header;
         th.title = `Click to sort by ${header}`;
         th.className = 'sortable';
+        th.tabIndex = 0;
+        th.setAttribute('role', 'button');
 
         // Add sort indicators
         if (sortColumn === header) {
             th.classList.add(sortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+            th.setAttribute('aria-sort', sortDirection === 'asc' ? 'ascending' : 'descending');
+
+            // If this is the sorted column, we should focus it if it was the interaction target
+            // But we don't know if it was the target.
+            // Better strategy: If document.activeElement was a TH, we try to maintain focus on the same column.
+            elementToFocus = th;
+        } else {
+            th.setAttribute('aria-sort', 'none');
         }
 
         // Add click handler for sorting
         th.addEventListener('click', () => sortBy(header, isMultiSheet));
 
+        // Add keyboard handler
+        th.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                sortBy(header, isMultiSheet);
+            }
+        });
+
         headerRow.appendChild(th);
     });
     tableHead.appendChild(headerRow);
+
+    // Restore focus to the sorted column if requested
+    if (shouldFocusSort && elementToFocus) {
+        elementToFocus.focus();
+        shouldFocusSort = false;
+    }
 
     // Calculate pagination
     const startIndex = (currentPage - 1) * rowsPerPage;
@@ -855,6 +884,9 @@ function displayData(data, isMultiSheet = false) {
 
 // Sort data by column
 function sortBy(column, isMultiSheet = false) {
+    // Set flag to restore focus after re-render
+    shouldFocusSort = true;
+
     if (sortColumn === column) {
         // Toggle direction
         sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';

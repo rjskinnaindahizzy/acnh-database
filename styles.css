@@ -556,6 +556,12 @@ th:hover {
     background: var(--accent-strong);
 }
 
+th:focus-visible {
+    outline: 2px solid white;
+    outline-offset: -4px;
+    background: var(--accent-strong);
+}
+
 th.sortable::after {
     content: ' ⇅';
     opacity: 0.3;
