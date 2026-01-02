@@ -737,14 +737,27 @@ function displayData(data, isMultiSheet = false) {
         th.textContent = header;
         th.title = `Click to sort by ${header}`;
         th.className = 'sortable';
+        th.setAttribute('tabindex', '0');
+        th.setAttribute('scope', 'col');
+        th.setAttribute('role', 'columnheader');
 
-        // Add sort indicators
+        // Add sort indicators and ARIA
         if (sortColumn === header) {
             th.classList.add(sortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+            th.setAttribute('aria-sort', sortDirection === 'asc' ? 'ascending' : 'descending');
+        } else {
+            th.setAttribute('aria-sort', 'none');
         }
 
         // Add click handler for sorting
-        th.addEventListener('click', () => sortBy(header, isMultiSheet));
+        const handleSort = () => sortBy(header, isMultiSheet);
+        th.addEventListener('click', handleSort);
+        th.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleSort();
+            }
+        });
 
         headerRow.appendChild(th);
     });
