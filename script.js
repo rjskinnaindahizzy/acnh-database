@@ -24,6 +24,7 @@ let prefetchQueue = [];
 let prefetchAbortToken = 0;
 let prefetchInFlight = 0;
 let prefetchRunning = false;
+let shouldFocusSort = false;
 const PREFETCH_CONCURRENCY = 2;
 const MOST_USED_SHEETS = [
     'Housewares',
@@ -737,14 +738,32 @@ function displayData(data, isMultiSheet = false) {
         th.textContent = header;
         th.title = `Click to sort by ${header}`;
         th.className = 'sortable';
+        th.setAttribute('scope', 'col');
+        th.setAttribute('tabindex', '0');
+        th.setAttribute('role', 'columnheader');
 
         // Add sort indicators
         if (sortColumn === header) {
             th.classList.add(sortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+            th.setAttribute('aria-sort', sortDirection === 'asc' ? 'ascending' : 'descending');
+        } else {
+            th.setAttribute('aria-sort', 'none');
         }
 
         // Add click handler for sorting
-        th.addEventListener('click', () => sortBy(header, isMultiSheet));
+        th.addEventListener('click', () => {
+            shouldFocusSort = false;
+            sortBy(header, isMultiSheet);
+        });
+
+        // Add keyboard handler for sorting
+        th.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                shouldFocusSort = true;
+                sortBy(header, isMultiSheet);
+            }
+        });
 
         headerRow.appendChild(th);
     });
@@ -894,6 +913,19 @@ function sortBy(column, isMultiSheet = false) {
     currentPage = 1; // Reset to first page
     displayData(currentData, isMultiSheet);
     updateRecordCount();
+
+    if (shouldFocusSort) {
+        // Restore focus to the sorted column header
+        // Since displayData re-rendered the table, we need to find the new element
+        const headers = document.querySelectorAll('#tableHead th');
+        for (const th of headers) {
+            if (th.textContent === column) {
+                th.focus();
+                break;
+            }
+        }
+        shouldFocusSort = false;
+    }
 }
 
 // Render pagination controls
