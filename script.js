@@ -737,14 +737,28 @@ function displayData(data, isMultiSheet = false) {
         th.textContent = header;
         th.title = `Click to sort by ${header}`;
         th.className = 'sortable';
+        th.tabIndex = 0;
+        th.scope = 'col';
+        th.setAttribute('role', 'columnheader');
 
         // Add sort indicators
         if (sortColumn === header) {
             th.classList.add(sortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+            th.setAttribute('aria-sort', sortDirection === 'asc' ? 'ascending' : 'descending');
+        } else {
+            th.setAttribute('aria-sort', 'none');
         }
 
         // Add click handler for sorting
         th.addEventListener('click', () => sortBy(header, isMultiSheet));
+
+        // Add keyboard support
+        th.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                sortBy(header, isMultiSheet);
+            }
+        });
 
         headerRow.appendChild(th);
     });
@@ -894,6 +908,14 @@ function sortBy(column, isMultiSheet = false) {
     currentPage = 1; // Reset to first page
     displayData(currentData, isMultiSheet);
     updateRecordCount();
+
+    // Restore focus to the sorted header
+    setTimeout(() => {
+        const sortedHeader = Array.from(document.querySelectorAll('th')).find(th => th.textContent === column);
+        if (sortedHeader) {
+            sortedHeader.focus();
+        }
+    }, 0);
 }
 
 // Render pagination controls
