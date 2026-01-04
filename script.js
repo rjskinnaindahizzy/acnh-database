@@ -2,12 +2,13 @@
 const SPREADSHEET_ID = '13d_LAJPlxMa_DubPTuirkIV4DERBMXbrWQsmSh8ReK4';
 const API_BASE_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
 const DEFAULT_API_KEY = (typeof window !== 'undefined' && window.DEFAULT_API_KEY) ? window.DEFAULT_API_KEY : ''; // Load from config if present
-const CACHE_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
+const CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
 
 // State management
 let currentData = [];
 let allData = [];
 let allSheetsData = {}; // Store data from all sheets { 'SheetName': [...rows] }
+let sheetTimestamps = {}; // Track freshness per sheet
 let availableSheets = []; // List of all sheet names
 let headers = [];
 let allHeaders = []; // All available headers
@@ -15,7 +16,7 @@ let visibleColumns = []; // Currently visible column names
 let sheetLoadPromises = {}; // Track in-flight sheet fetches to avoid duplicate requests
 let apiKey = DEFAULT_API_KEY; // Default from config if available
 let currentPage = 1;
-let rowsPerPage = 50;
+let rowsPerPage = 25;
 let sortColumn = null;
 let sortDirection = 'asc';
 let currentSheet = '';
@@ -24,6 +25,22 @@ let prefetchQueue = [];
 let prefetchAbortToken = 0;
 let prefetchInFlight = 0;
 let prefetchRunning = false;
+let lastIsSearch = false;
+let lastIsMultiSheet = false;
+let lastQuery = '';
+let recordMeta = { total: 0, showing: 0, start: 0, end: 0 };
+let fuseIndexes = {};
+let favorites = new Set();
+let favoritesOnly = false;
+let viewMode = 'table';
+let pendingUrlState = null;
+let selectedRowKeys = new Set();
+let recentSearches = [];
+let savedSearches = [];
+let recentSaveTimer = null;
+let lastSavedSearch = '';
+let nameDictionary = new Set();
+let initialLoadDone = false;
 const PREFETCH_CONCURRENCY = 2;
 const MOST_USED_SHEETS = [
     'Housewares',
@@ -37,6 +54,24 @@ const MOST_USED_SHEETS = [
     'Rugs',
     'Music'
 ];
+const FAVORITES_STORAGE_KEY = 'acnhFavorites';
+const SPOTLIGHT_COLUMNS = [
+    'Source',
+    'Tag',
+    'Color 1',
+    'Color 2',
+    'Style 1',
+    'Style 2',
+    'Theme',
+    'Set',
+    'Series',
+    'Personality',
+    'Species',
+    'Hobby',
+    'Type'
+];
+const PRICE_COLUMNS = ['Buy', 'Sell', 'Sell Price', 'Price', 'Value'];
+const NAME_COLUMNS = ['Name', 'Item', 'Item Name', 'Villager', 'Recipe', 'Song', 'Critter'];
 
 // Column presets per sheet type
 const COLUMN_PRESETS = {
@@ -44,6 +79,9 @@ const COLUMN_PRESETS = {
     'Villagers': ['Name', 'Image', 'Species', 'Gender', 'Personality', 'Birthday', 'Catchphrase', 'Favorite Song'],
     'default': ['Name', 'Image'] // Fallback for unknown sheets
 };
+const MAX_RECENT_SEARCHES = 10;
+const MAX_SAVED_SEARCHES = 10;
+const SELECT_COLUMN = 'Select';
 
 // DOM Elements
 const apiKeyInput = document.getElementById('apiKeyInput');
@@ -51,13 +89,21 @@ const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
 const apiKeyStatus = document.getElementById('apiKeyStatus');
 const apiKeySection = document.getElementById('apiKeySection');
 const searchInput = document.getElementById('searchInput');
+const searchAssist = document.getElementById('searchAssist');
 const sheetSelect = document.getElementById('sheetSelect');
 const diyFilter = document.getElementById('diyFilter');
 const catalogFilter = document.getElementById('catalogFilter');
+const filtersPanel = document.getElementById('filtersPanel');
+const mobileFiltersBtn = document.getElementById('mobileFiltersBtn');
+const mobileFilterToggle = document.getElementById('mobileFilterToggle');
+const mobileFilterSummary = document.getElementById('mobileFilterSummary');
+const filterBackdrop = document.getElementById('filterBackdrop');
+const closeFiltersBtn = document.getElementById('closeFiltersBtn');
 const columnToggleBtn = document.getElementById('columnToggleBtn');
 const columnTogglePanel = document.getElementById('columnTogglePanel');
 const closeColumnToggle = document.getElementById('closeColumnToggle');
-const refreshBtn = document.getElementById('refreshBtn');
+const showAllColumnsBtn = document.getElementById('showAllColumnsBtn');
+const compactColumnsBtn = document.getElementById('compactColumnsBtn');
 const columnCheckboxes = document.getElementById('columnCheckboxes');
 const loading = document.getElementById('loading');
 const emptyState = document.getElementById('emptyState');
@@ -68,6 +114,30 @@ const resultsSection = document.getElementById('resultsSection');
 const tableHead = document.getElementById('tableHead');
 const tableBody = document.getElementById('tableBody');
 const recordCount = document.getElementById('recordCount');
+const selectionCount = document.getElementById('selectionCount');
+const liveRegion = document.getElementById('liveRegion');
+const progressBar = document.getElementById('progressBar');
+const globalProgress = document.getElementById('globalProgress');
+const viewToggleBtn = document.getElementById('viewToggleBtn');
+const favoritesToggleBtn = document.getElementById('favoritesToggleBtn');
+const cardsContainer = document.getElementById('cardsContainer');
+const cardGrid = document.getElementById('cardGrid');
+const tableContainer = document.querySelector('.table-container');
+const resultsHeader = document.getElementById('resultsHeader');
+const resultsTitle = document.getElementById('resultsTitle');
+const resultsSubtitle = document.getElementById('resultsSubtitle');
+const scrollHint = document.getElementById('scrollHint');
+const insightRecords = document.getElementById('insightRecords');
+const insightScope = document.getElementById('insightScope');
+const insightFavorites = document.getElementById('insightFavorites');
+const insightFavoritesSub = document.getElementById('insightFavoritesSub');
+const insightSpotlightLabel = document.getElementById('insightSpotlightLabel');
+const insightSpotlight = document.getElementById('insightSpotlight');
+const insightSpotlightSub = document.getElementById('insightSpotlightSub');
+const insightValueLabel = document.getElementById('insightValueLabel');
+const insightValue = document.getElementById('insightValue');
+const insightValueSub = document.getElementById('insightValueSub');
+const activeFilters = document.getElementById('activeFilters');
 
 // IndexedDB for sheet caching
 const DB_NAME = 'acnhSheetCache';
@@ -76,11 +146,25 @@ let dbPromise = null;
 
 // Initialize the application
 async function init() {
+    favorites = loadFavorites();
+    loadSearchHistory();
+    pendingUrlState = parseStateFromUrl();
+
+    if (pendingUrlState && pendingUrlState.view) {
+        viewMode = pendingUrlState.view === 'cards' ? 'cards' : 'table';
+    } else if (window.innerWidth < 768) {
+        viewMode = 'cards'; // default to cards on small screens
+    }
+    if (pendingUrlState && pendingUrlState.favorites) {
+        favoritesOnly = true;
+    }
+    setViewMode(viewMode, { silent: true });
+    setFavoritesOnly(favoritesOnly, true);
+
     loadApiKeyFromStorage();
     setupEventListeners();
-
-    // Hide filters, columns button, and stats initially
-    hideFiltersAndControls();
+    handleResponsiveFilters();
+    updateInsights([]);
 
     // Show loading state while we fetch sheets
     showEmptyState('loading');
@@ -104,26 +188,342 @@ function hideFiltersAndControls() {
     diyFilter.style.display = 'none';
     catalogFilter.style.display = 'none';
     columnToggleBtn.style.display = 'none';
-    refreshBtn.style.display = 'none';
     recordCount.style.display = 'none';
+    if (viewToggleBtn) {
+        viewToggleBtn.style.display = 'none';
+        viewToggleBtn.setAttribute('aria-hidden', 'true');
+    }
+    updateMobileFilterSummary();
 }
 
 // Show filters and controls
 function showFiltersAndControls() {
     columnToggleBtn.style.display = 'block';
-    refreshBtn.style.display = 'block';
     recordCount.style.display = 'block';
+    if (viewToggleBtn) {
+        viewToggleBtn.style.display = '';
+        viewToggleBtn.removeAttribute('aria-hidden');
+    }
+    handleResponsiveFilters();
     // DIY and Catalog filters shown based on sheet content via updateFilterVisibility()
+    updateMobileFilterSummary();
+}
+
+function isMobileViewport() {
+    return window.innerWidth < 768;
+}
+
+function isFiltersPanelOpen() {
+    return false;
+}
+
+function toggleFiltersPanel(forceState, options = {}) {
+    // Overlay filters removed; keep stub for compatibility
+    return;
+}
+
+function handleResponsiveFilters() {
+    if (!filtersPanel) return;
+    filtersPanel.classList.remove('mobile-open');
+    filtersPanel.removeAttribute('aria-hidden');
+    updateScrollHint();
+}
+
+function updateMobileFilterSummary() {
+    if (!mobileFilterSummary) return;
+    const sheetLabel = currentSheet || 'All sheets';
+    const parts = [];
+
+    if (diyFilter && diyFilter.value) parts.push(`DIY: ${diyFilter.value}`);
+    if (catalogFilter && catalogFilter.value) parts.push(`Catalog: ${catalogFilter.value}`);
+    if (favoritesOnly) parts.push('Favorites');
+
+    if (parts.length) {
+        mobileFilterSummary.textContent = `${sheetLabel} • ${parts.join(' • ')}`;
+    } else {
+        mobileFilterSummary.textContent = currentSheet ? `${sheetLabel} • No filters` : sheetLabel;
+    }
+}
+
+// Announce updates for screen readers
+function announce(message, politeness = 'polite') {
+    if (!liveRegion) return;
+    liveRegion.setAttribute('aria-live', politeness);
+    liveRegion.textContent = '';
+    setTimeout(() => {
+        liveRegion.textContent = message;
+    }, 10);
+}
+
+// Favorites helpers
+function loadFavorites() {
+    try {
+        const raw = localStorage.getItem(FAVORITES_STORAGE_KEY);
+        if (!raw) return new Set();
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+            return new Set(parsed);
+        }
+        return new Set();
+    } catch (err) {
+        console.warn('Could not load favorites', err);
+        return new Set();
+    }
+}
+
+function saveFavorites() {
+    try {
+        localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(Array.from(favorites)));
+    } catch (err) {
+        console.warn('Could not save favorites', err);
+    }
+}
+
+function favoriteKey(row) {
+    const name = row['Name'] || row['name'] || row['Item'] || '';
+    const id = row['id'] || row['ID'] || name;
+    return `${row._sheet || 'sheet'}::${id}`;
+}
+
+function rowSelectionKey(row) {
+    const id = row['Unique Entry ID'] || row['Internal ID'] || row['Item ID'] || row['id'] || row['ID'] || row['Filename'] || row['Name'] || JSON.stringify(row).slice(0, 24);
+    return `${row._sheet || currentSheet || 'sheet'}::${id}`;
+}
+
+function isFavorite(row) {
+    return favorites.has(favoriteKey(row));
+}
+
+function toggleFavorite(row) {
+    const key = favoriteKey(row);
+    if (favorites.has(key)) {
+        favorites.delete(key);
+        announce(`${row.Name || 'Item'} removed from favorites.`);
+    } else {
+        favorites.add(key);
+        announce(`${row.Name || 'Item'} added to favorites.`);
+    }
+    saveFavorites();
+    displayData(currentData, lastIsMultiSheet);
+    syncUrlState();
+}
+
+// Search history helpers
+function loadSearchHistory() {
+    try {
+        const recents = JSON.parse(localStorage.getItem('acnhRecentSearches') || '[]');
+        const saved = JSON.parse(localStorage.getItem('acnhSavedSearches') || '[]');
+        if (Array.isArray(recents)) recentSearches = recents.slice(0, MAX_RECENT_SEARCHES);
+        if (Array.isArray(saved)) savedSearches = saved.slice(0, MAX_SAVED_SEARCHES);
+    } catch (err) {
+        recentSearches = [];
+        savedSearches = [];
+    }
+}
+
+function persistSearchHistory() {
+    localStorage.setItem('acnhRecentSearches', JSON.stringify(recentSearches.slice(0, MAX_RECENT_SEARCHES)));
+    localStorage.setItem('acnhSavedSearches', JSON.stringify(savedSearches.slice(0, MAX_SAVED_SEARCHES)));
+}
+
+function addRecentSearch(query) {
+    if (!query) return;
+    recentSearches = recentSearches.filter(q => q.toLowerCase() !== query.toLowerCase());
+    recentSearches.unshift(query);
+    if (recentSearches.length > MAX_RECENT_SEARCHES) {
+        recentSearches.length = MAX_RECENT_SEARCHES;
+    }
+    persistSearchHistory();
+    renderSearchAssist(query);
+}
+
+function removeRecentSearch(query) {
+    if (!query) return;
+    recentSearches = recentSearches.filter(q => q.toLowerCase() !== query.toLowerCase());
+    persistSearchHistory();
+}
+
+function queueRecentSearchSave(query, immediate = false) {
+    const normalized = (query || '').trim();
+    if (!normalized || normalized.length < 2) {
+        clearTimeout(recentSaveTimer);
+        return;
+    }
+
+    const save = () => {
+        if (normalized.toLowerCase() === lastSavedSearch.toLowerCase()) return;
+        addRecentSearch(normalized);
+        lastSavedSearch = normalized;
+    };
+
+    clearTimeout(recentSaveTimer);
+    if (immediate) {
+        save();
+    } else {
+        recentSaveTimer = setTimeout(save, 600);
+    }
+}
+
+function saveCurrentSearch(query) {
+    if (!query) return;
+    savedSearches = savedSearches.filter(q => q.toLowerCase() !== query.toLowerCase());
+    savedSearches.unshift(query);
+    if (savedSearches.length > MAX_SAVED_SEARCHES) {
+        savedSearches.length = MAX_SAVED_SEARCHES;
+    }
+    persistSearchHistory();
+    renderSearchAssist(query);
+    announce('Search saved.');
+}
+
+function setFavoritesOnly(enabled, silent = false) {
+    favoritesOnly = enabled;
+    if (favoritesToggleBtn) {
+        favoritesToggleBtn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+        favoritesToggleBtn.textContent = enabled ? 'Favorites only' : 'Favorites';
+    }
+    if (!silent) {
+        applyFilters();
+    }
+    updateMobileFilterSummary();
+}
+
+// View mode helpers
+function setViewMode(mode, options = {}) {
+    const { silent = false } = options;
+    viewMode = mode === 'cards' ? 'cards' : 'table';
+    const isCards = viewMode === 'cards';
+
+    if (viewToggleBtn) {
+        viewToggleBtn.textContent = isCards ? 'Table view' : 'Card view';
+        viewToggleBtn.setAttribute('aria-pressed', isCards ? 'true' : 'false');
+        viewToggleBtn.title = isCards ? 'Switch back to table view' : 'Switch to card view';
+    }
+
+    if (tableContainer) tableContainer.style.display = isCards ? 'none' : 'block';
+    if (cardsContainer) cardsContainer.style.display = isCards ? 'block' : 'none';
+
+    if (!silent) {
+        displayData(currentData, lastIsMultiSheet);
+        syncUrlState();
+    }
+}
+
+function toggleViewMode() {
+    setViewMode(viewMode === 'table' ? 'cards' : 'table');
+}
+
+// URL state helpers for deep linking
+function parseStateFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        sheet: params.get('sheet') || '',
+        search: params.get('search') || '',
+        diy: params.get('diy') || '',
+        catalog: params.get('catalog') || '',
+        view: params.get('view') || '',
+        favorites: params.get('favorites') === '1' || params.get('favorites') === 'true'
+    };
+}
+
+function syncUrlState() {
+    const params = new URLSearchParams();
+    if (currentSheet) params.set('sheet', currentSheet);
+    const searchVal = searchInput.value.trim();
+    if (searchVal) params.set('search', searchVal);
+    if (diyFilter.value) params.set('diy', diyFilter.value);
+    if (catalogFilter.value) params.set('catalog', catalogFilter.value);
+    if (viewMode === 'cards') params.set('view', 'cards');
+    if (favoritesOnly) params.set('favorites', '1');
+
+    const newUrl = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
+    if (history.replaceState) {
+        history.replaceState({}, '', newUrl);
+    }
+}
+
+// Progress indicator for batch/global loading
+function setGlobalProgress(completed, total) {
+    if (!progressBar || !globalProgress) return;
+    const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+    globalProgress.style.display = 'block';
+    globalProgress.setAttribute('aria-hidden', 'false');
+    globalProgress.setAttribute('aria-valuenow', String(percent));
+    progressBar.style.width = `${percent}%`;
+}
+
+function clearGlobalProgress() {
+    if (!progressBar || !globalProgress) return;
+    globalProgress.style.display = 'none';
+    globalProgress.setAttribute('aria-hidden', 'true');
+    globalProgress.setAttribute('aria-valuenow', '0');
+    progressBar.style.width = '0%';
+}
+
+async function applyInitialUrlState() {
+    if (!pendingUrlState) return { applied: false };
+    const state = pendingUrlState;
+    pendingUrlState = null;
+
+    // Apply view-only state up front
+    if (state.view) {
+        setViewMode(state.view, { silent: true });
+    }
+    setFavoritesOnly(state.favorites, true);
+
+    let needsApply = false;
+
+    if (state.sheet && availableSheets.includes(state.sheet)) {
+        sheetSelect.value = state.sheet;
+        currentSheet = state.sheet;
+        showFiltersAndControls();
+        await loadSheetData(currentSheet);
+        updateFilterVisibility();
+        needsApply = true;
+    }
+
+    if (state.search) {
+        searchInput.value = state.search;
+        needsApply = true;
+    }
+    if (state.diy) {
+        diyFilter.value = state.diy;
+        needsApply = true;
+    }
+    if (state.catalog) {
+        catalogFilter.value = state.catalog;
+        needsApply = true;
+    }
+    if (state.favorites) {
+        needsApply = true;
+    }
+
+    if (needsApply) {
+        await applyFilters();
+        return { applied: true };
+    }
+
+    return { applied: false };
 }
 
 // Setup event listeners
 function setupEventListeners() {
     saveApiKeyBtn.addEventListener('click', saveApiKey);
 
-    // Real-time search
+    // Search box interactions (do not auto-run search on every keystroke)
     searchInput.addEventListener('input', () => {
-        cancelPrefetch('search change');
-        applyFilters();
+        const q = searchInput.value.trim();
+        renderSearchAssist(q);
+    });
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            runSearch();
+        }
+    });
+    searchInput.addEventListener('focus', () => renderSearchAssist(searchInput.value.trim()));
+    searchInput.addEventListener('blur', () => {
+        setTimeout(() => searchAssist && searchAssist.classList.remove('visible'), 120);
     });
 
     // Auto-load on sheet selection
@@ -141,65 +541,124 @@ function setupEventListeners() {
                 updateFilterVisibility();
                 await applyFilters();
                 startPrefetchQueue();
+                syncUrlState();
             } catch (error) {
                 console.error(`Error loading sheet ${currentSheet}:`, error);
-                showEmptyState('error');
-                updateEmptyStateMessage(error.message || 'Failed to load sheet data. Please try again.');
+                showEmptyState('error', {
+                    title: `Failed to load ${currentSheet}`,
+                    message: error.message || 'Failed to load sheet data. Please try again.'
+                });
             }
         } else {
-            // Hide controls when "Select a sheet..." is chosen
-            hideFiltersAndControls();
-            // If there's a search term, run a global search; otherwise show no-sheet state
-            if (hasSearch) {
-                await applyFilters();
-            } else {
-                showEmptyState('noSheet');
-            }
+            // All sheets view - keep controls visible and load global data
+            showFiltersAndControls();
+            await applyFilters();
         }
     });
 
     // Filter changes
-    diyFilter.addEventListener('change', applyFilters);
-    catalogFilter.addEventListener('change', applyFilters);
+    diyFilter.addEventListener('change', () => {
+        applyFilters();
+        syncUrlState();
+    });
+    catalogFilter.addEventListener('change', () => {
+        applyFilters();
+        syncUrlState();
+    });
 
     // Column toggle
-    columnToggleBtn.addEventListener('click', () => {
-        columnTogglePanel.style.display = columnTogglePanel.style.display === 'none' ? 'block' : 'none';
-    });
-
-    closeColumnToggle.addEventListener('click', () => {
-        columnTogglePanel.style.display = 'none';
-    });
-
-    refreshBtn.addEventListener('click', async () => {
-        if (!currentSheet) {
-            showEmptyState('noSheet');
-            return;
-        }
-
-        refreshBtn.disabled = true;
-        await clearSheetCache(currentSheet);
-        cancelPrefetch('manual refresh');
-
-        try {
-            await loadSheetData(currentSheet, { forceRefresh: true });
-            updateFilterVisibility();
-            await applyFilters();
-        } catch (error) {
-            console.error(`Error refreshing sheet ${currentSheet}:`, error);
-            showEmptyState('error', {
-                title: `Failed to refresh ${currentSheet}`,
-                message: error.message || 'Please try again.'
-            });
-        } finally {
-            refreshBtn.disabled = false;
-        }
-    });
+    columnToggleBtn.addEventListener('click', () => toggleColumnPanel());
+    closeColumnToggle.addEventListener('click', () => toggleColumnPanel(false));
+    if (showAllColumnsBtn) {
+        showAllColumnsBtn.addEventListener('click', showAllColumns);
+    }
+    if (compactColumnsBtn) {
+        compactColumnsBtn.addEventListener('click', applyCompactPreset);
+    }
+    // Ensure ARIA state is in sync on load
+    toggleColumnPanel(false, true);
 
     apiKeyInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             saveApiKey();
         }
+    });
+
+    if (viewToggleBtn) {
+        viewToggleBtn.addEventListener('click', toggleViewMode);
+    }
+    if (favoritesToggleBtn) {
+        favoritesToggleBtn.addEventListener('click', () => setFavoritesOnly(!favoritesOnly));
+    }
+
+    if (window.innerWidth < 768) {
+        initPullToRefresh();
+    }
+
+    window.addEventListener('resize', handleResponsiveFilters);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            if (columnTogglePanel && columnTogglePanel.style.display === 'block') {
+                toggleColumnPanel(false);
+            }
+        }
+    });
+
+    if (tableContainer) {
+        tableContainer.addEventListener('scroll', () => {
+            if (scrollHint) {
+                scrollHint.classList.remove('visible');
+            }
+        });
+    }
+}
+
+function runSearch(queryOverride) {
+    const q = (typeof queryOverride === 'string' ? queryOverride : searchInput.value).trim();
+    if (typeof queryOverride === 'string') {
+        searchInput.value = queryOverride;
+    }
+    cancelPrefetch('search submit');
+    queueRecentSearchSave(q, true);
+    applyFilters();
+}
+
+function triggerRefresh() {
+    if (currentSheet) {
+        clearSheetCache(currentSheet)
+            .then(() => loadSheetData(currentSheet, { forceRefresh: true }))
+            .then(() => {
+                updateFilterVisibility();
+                return applyFilters();
+            })
+            .catch(err => console.error('Auto refresh failed', err));
+    } else {
+        applyFilters();
+    }
+}
+
+function initPullToRefresh() {
+    let startY = 0;
+    let pulling = false;
+
+    window.addEventListener('touchstart', (e) => {
+        if (window.scrollY === 0) {
+            startY = e.touches[0].clientY;
+            pulling = true;
+        }
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+        if (!pulling) return;
+        const delta = e.touches[0].clientY - startY;
+        if (delta > 80) {
+            pulling = false;
+            triggerRefresh();
+        }
+    }, { passive: true });
+
+    window.addEventListener('touchend', () => {
+        pulling = false;
     });
 }
 
@@ -238,7 +697,7 @@ async function getCachedSheet(sheetName) {
                     clearSheetCache(sheetName).then(() => resolve(null)).catch(() => resolve(null));
                     return;
                 }
-                resolve({ headers, data });
+                resolve({ headers, data, timestamp });
             };
             req.onerror = () => reject(req.error);
         });
@@ -259,7 +718,7 @@ async function saveSheetToCache(sheetName, sheetData) {
             tx.onerror = () => reject(tx.error);
             tx.objectStore('sheets').put({
                 name: sheetName,
-                timestamp: Date.now(),
+                timestamp: sheetData.timestamp || Date.now(),
                 headers: sheetData.headers,
                 data: sheetData.data
             });
@@ -281,6 +740,8 @@ async function clearSheetCache(sheetName) {
             tx.objectStore('sheets').delete(sheetName);
         });
         delete allSheetsData[sheetName];
+        delete fuseIndexes[sheetName];
+        delete sheetTimestamps[sheetName];
     } catch (err) {
         console.warn('Unable to clear cache for', sheetName, err);
     }
@@ -304,7 +765,7 @@ async function saveApiKey() {
     const key = apiKeyInput.value.trim();
 
     if (!key) {
-        apiKeyStatus.textContent = '✗ Please enter an API key';
+        apiKeyStatus.textContent = 'Please enter an API key';
         apiKeyStatus.className = 'error';
         return;
     }
@@ -324,7 +785,7 @@ async function saveApiKey() {
         // API key works!
         apiKey = key;
         localStorage.setItem('googleSheetsApiKey', key);
-        apiKeyStatus.textContent = '✓ API Key Saved Successfully!';
+        apiKeyStatus.textContent = 'API Key Saved Successfully!';
         apiKeyStatus.className = 'success';
 
         // Hide API key section
@@ -337,7 +798,7 @@ async function saveApiKey() {
 
     } catch (error) {
         console.error('API key validation error:', error);
-        apiKeyStatus.textContent = '✗ Invalid API key. Please check and try again.';
+        apiKeyStatus.textContent = 'Invalid API key. Please check and try again.';
         apiKeyStatus.className = 'error';
     }
 }
@@ -357,10 +818,14 @@ async function loadAvailableSheets() {
 
         // Show loading state
         showEmptyState('loading');
-        updateEmptyStateMessage('Fetching spreadsheet information...');
 
         const url = `${API_BASE_URL}/${SPREADSHEET_ID}?key=${apiKey}`;
-        const response = await fetch(url);
+        let response;
+        try {
+            response = await fetch(url);
+        } catch (err) {
+            throw new Error('Network error while loading sheet list. Please check your connection and try again.');
+        }
 
         if (!response.ok) {
             if (response.status === 403) {
@@ -379,13 +844,22 @@ async function loadAvailableSheets() {
             throw new Error('No sheets found in the spreadsheet.');
         }
 
-        // Store all sheet names (including Read Me)
-        availableSheets = sheets.map(s => s.properties.title);
+        // Exclude README/Read Me helper tab from selection
+        const visibleSheets = sheets.filter(sheet => {
+            const title = (sheet.properties.title || '').replace(/\s+/g, '').toLowerCase();
+            return !title.startsWith('readme');
+        });
+
+        if (visibleSheets.length === 0) {
+            throw new Error('No selectable sheets found after excluding the README tab.');
+        }
+
+        availableSheets = visibleSheets.map(s => s.properties.title);
 
         // Populate sheet selector
-        sheetSelect.innerHTML = '<option value="">Select a sheet...</option>';
+        sheetSelect.innerHTML = '<option value="">All sheets</option>';
 
-        sheets.forEach(sheet => {
+        visibleSheets.forEach(sheet => {
             const sheetTitle = sheet.properties.title;
             const option = document.createElement('option');
             option.value = sheetTitle;
@@ -395,15 +869,38 @@ async function loadAvailableSheets() {
 
         // Enable the selector and prompt user to choose a sheet
         sheetSelect.disabled = false;
-        updateEmptyStateMessage(`Found ${availableSheets.length} sheets. Select one to load.`);
-        showEmptyState('noSheet');
+        showFiltersAndControls();
+
+        // If there is a deep-link state, honor it; otherwise load all sheets immediately
+        const hasDeepLinkState = Boolean(
+            pendingUrlState && (
+                pendingUrlState.sheet ||
+                pendingUrlState.search ||
+                pendingUrlState.diy ||
+                pendingUrlState.catalog ||
+                pendingUrlState.favorites
+            )
+        );
+
+        const urlStateResult = await applyInitialUrlState();
+
+        if (!hasDeepLinkState || !urlStateResult.applied) {
+            await applyFilters({ suppressLoadingState: true });
+        }
+
+        // Warm up frequently used sheets so the first selection is instant
+        startPrefetchQueue();
+
+        initialLoadDone = true;
 
     } catch (error) {
         console.error('Error loading sheets:', error);
         sheetSelect.innerHTML = '<option value="">Error loading sheets</option>';
         sheetSelect.disabled = true;
-        showEmptyState('error');
-        updateEmptyStateMessage(error.message || 'Failed to load sheets. Please check your connection and try again.');
+        showEmptyState('error', {
+            title: 'Error loading sheets',
+            message: error.message || 'Failed to load sheets. Please check your connection and try again.'
+        });
     }
 }
 
@@ -411,14 +908,20 @@ async function loadAvailableSheets() {
 async function loadSheetData(sheetName, { forceRefresh = false, showLoading = true } = {}) {
     if (!sheetName) return null;
 
-    if (!forceRefresh && allSheetsData[sheetName]) {
-        return allSheetsData[sheetName];
+    const existing = allSheetsData[sheetName];
+    if (!forceRefresh && existing) {
+        const age = sheetTimestamps[sheetName] ? Date.now() - sheetTimestamps[sheetName] : 0;
+        if (age > 0 && age < CACHE_TTL_MS) {
+            return existing;
+        }
+        // Data is stale; refresh from network
     }
 
     if (!forceRefresh) {
         const cached = await getCachedSheet(sheetName);
         if (cached) {
             allSheetsData[sheetName] = cached;
+            sheetTimestamps[sheetName] = cached.timestamp || Date.now();
             return cached;
         }
     }
@@ -437,7 +940,12 @@ async function loadSheetData(sheetName, { forceRefresh = false, showLoading = tr
 
         const range = encodeURIComponent(`${sheetName}!A:ZZ`);
         const url = `${API_BASE_URL}/${SPREADSHEET_ID}/values/${range}?key=${apiKey}`;
-        const response = await fetch(url);
+        let response;
+        try {
+            response = await fetch(url);
+        } catch (err) {
+            throw new Error(`Network error while loading ${sheetName}. Please check your connection.`);
+        }
 
         if (!response.ok) {
             if (response.status === 403) {
@@ -452,6 +960,10 @@ async function loadSheetData(sheetName, { forceRefresh = false, showLoading = tr
         const data = await response.json();
         const rows = data.values || [];
         const headers = rows[0] || [];
+
+        if (!rows.length || !headers.length) {
+            throw new Error(`Invalid data received for ${sheetName}.`);
+        }
         const dataRows = [];
 
         for (let i = 1; i < rows.length; i++) {
@@ -465,9 +977,18 @@ async function loadSheetData(sheetName, { forceRefresh = false, showLoading = tr
             dataRows.push(rowData);
         }
 
-        const sheetData = { headers, data: dataRows };
+        dataRows.forEach(row => {
+            if (row.Name) {
+                nameDictionary.add(row.Name);
+            }
+        });
+
+        const fetchedAt = Date.now();
+        const sheetData = { headers, data: dataRows, timestamp: fetchedAt };
         allSheetsData[sheetName] = sheetData;
+        sheetTimestamps[sheetName] = fetchedAt;
         await saveSheetToCache(sheetName, sheetData);
+        ensureFuseIndex(sheetName);
         return sheetData;
     })().finally(() => {
         delete sheetLoadPromises[sheetName];
@@ -477,15 +998,21 @@ async function loadSheetData(sheetName, { forceRefresh = false, showLoading = tr
 }
 
 // Ensure all sheets are loaded when performing a cross-sheet search
-async function ensureSheetsLoadedForSearch() {
+async function ensureSheetsLoadedForSearch(suppressLoadingState = false) {
     const missingSheets = [];
 
     // Try to hydrate from cache first
     for (const name of availableSheets) {
+        const ts = sheetTimestamps[name];
+        if (allSheetsData[name] && ts && Date.now() - ts >= CACHE_TTL_MS) {
+            delete allSheetsData[name];
+            delete fuseIndexes[name];
+        }
         if (allSheetsData[name]) continue;
         const cached = await getCachedSheet(name);
         if (cached) {
             allSheetsData[name] = cached;
+            sheetTimestamps[name] = cached.timestamp || Date.now();
         } else {
             missingSheets.push(name);
         }
@@ -493,10 +1020,13 @@ async function ensureSheetsLoadedForSearch() {
 
     if (missingSheets.length === 0) return;
 
-    showEmptyState('loading', {
-        title: 'Loading sheets...',
-        message: `Batch loading ${missingSheets.length} sheet(s)...`
-    });
+    if (!suppressLoadingState) {
+        showEmptyState('loading', {
+            title: 'Loading...',
+            message: 'Fetching spreadsheet data. Please wait.'
+        });
+        setGlobalProgress(0, missingSheets.length);
+    }
 
     const chunkSize = 10;
     let loadedCount = 0;
@@ -514,11 +1044,13 @@ async function ensureSheetsLoadedForSearch() {
         await chunkPromise;
 
         loadedCount += chunk.length;
-        const percentage = Math.round((loadedCount / missingSheets.length) * 100);
-        showEmptyState('loading', {
-            title: `Loading sheets (${loadedCount}/${missingSheets.length})...`,
-            message: `${percentage}% complete`
-        });
+        if (!suppressLoadingState) {
+            setGlobalProgress(loadedCount, missingSheets.length);
+        }
+    }
+
+    if (!suppressLoadingState) {
+        clearGlobalProgress();
     }
 }
 
@@ -530,7 +1062,12 @@ async function fetchSheetsBatch(sheetNames) {
     const rangesQuery = sheetNames.map(name => `ranges=${encodeURIComponent(`${name}!A:ZZ`)}`).join('&');
     const url = `${API_BASE_URL}/${SPREADSHEET_ID}/values:batchGet?${rangesQuery}&key=${apiKey}`;
 
-    const response = await fetch(url);
+    let response;
+    try {
+        response = await fetch(url);
+    } catch (err) {
+        throw new Error('Network error while batch loading sheets. Please check your connection.');
+    }
 
     if (!response.ok) {
         if (response.status === 403) {
@@ -549,6 +1086,10 @@ async function fetchSheetsBatch(sheetNames) {
         const sheetName = range.range.split('!')[0];
         const rows = range.values || [];
         const headers = rows[0] || [];
+
+        if (!rows.length || !headers.length) {
+            throw new Error(`Invalid data received for sheet ${sheetName}.`);
+        }
         const dataRows = [];
 
         for (let i = 1; i < rows.length; i++) {
@@ -560,10 +1101,129 @@ async function fetchSheetsBatch(sheetNames) {
             dataRows.push(rowData);
         }
 
-        const sheetData = { headers, data: dataRows };
+        const fetchedAt = Date.now();
+        const sheetData = { headers, data: dataRows, timestamp: fetchedAt };
         allSheetsData[sheetName] = sheetData;
+        sheetTimestamps[sheetName] = fetchedAt;
         await saveSheetToCache(sheetName, sheetData);
     }
+}
+
+function ensureFuseIndex(sheetName) {
+    if (fuseIndexes[sheetName] || !window.Fuse) return;
+    const sheetData = allSheetsData[sheetName];
+    if (!sheetData || !sheetData.data) return;
+
+    const indexedRows = sheetData.data.map(row => ({
+        __ref: row,
+        __haystack: Object.values(row).join(' ').toLowerCase()
+    }));
+
+    fuseIndexes[sheetName] = new Fuse(indexedRows, {
+        keys: ['__haystack'],
+        threshold: 0.34,
+        ignoreLocation: true,
+        includeScore: true,
+        minMatchCharLength: 2
+    });
+}
+
+function runSearchOnSheet(sheetName, query) {
+    const sheetData = allSheetsData[sheetName];
+    if (!sheetData || !sheetData.data) return [];
+    const q = query.trim().toLowerCase();
+    if (!q) return sheetData.data;
+
+    ensureFuseIndex(sheetName);
+    const fuse = fuseIndexes[sheetName];
+    if (fuse) {
+        return fuse.search(q).map(res => res.item.__ref);
+    }
+
+    // Fallback to basic substring search if Fuse isn't available
+    return sheetData.data.filter(row => {
+        return Object.values(row).some(value => String(value).toLowerCase().includes(q));
+    });
+}
+
+function buildNameSuggestions(query) {
+    if (!query || query.length < 2) return [];
+    const q = query.toLowerCase();
+    const matches = [];
+    for (const name of nameDictionary) {
+        if (name.toLowerCase().includes(q)) {
+            matches.push(name);
+        }
+        if (matches.length >= 8) break;
+    }
+    return matches;
+}
+
+function renderSearchAssist(query = '') {
+    if (!searchAssist) return;
+    searchAssist.innerHTML = '';
+
+    const sections = [];
+    const hasQuery = query && query.length > 0;
+    const suggestionItems = hasQuery ? buildNameSuggestions(query) : [];
+
+    if (hasQuery && suggestionItems.length) {
+        sections.push({ title: 'Suggestions', items: suggestionItems });
+    }
+    if (recentSearches.length) {
+        sections.push({ title: 'Recent', items: recentSearches });
+    }
+
+    if (!sections.length) {
+        searchAssist.classList.remove('visible');
+        return;
+    }
+
+    sections.forEach(section => {
+        const header = document.createElement('div');
+        header.className = 'assist-section-header';
+        header.textContent = section.title;
+        searchAssist.appendChild(header);
+
+        section.items.slice(0, 8).forEach(item => {
+            const row = document.createElement('div');
+            row.className = 'assist-row';
+
+            const option = document.createElement('button');
+            option.type = 'button';
+            option.className = 'assist-item';
+            option.setAttribute('role', 'option');
+            option.textContent = item;
+            option.addEventListener('mousedown', (e) => {
+                // Prevent blur before we handle click
+                e.preventDefault();
+            });
+            option.addEventListener('click', () => {
+                searchInput.value = item;
+                renderSearchAssist(item);
+                runSearch(item);
+            });
+            row.appendChild(option);
+
+            if (section.title === 'Recent') {
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'assist-remove';
+                removeBtn.setAttribute('aria-label', `Remove "${item}" from recent searches`);
+                removeBtn.textContent = 'Remove';
+                removeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    removeRecentSearch(item);
+                    renderSearchAssist(query);
+                });
+                row.appendChild(removeBtn);
+            }
+
+            searchAssist.appendChild(row);
+        });
+    });
+
+    searchAssist.classList.add('visible');
 }
 
 // Populate column toggle checkboxes
@@ -571,12 +1231,14 @@ function populateColumnToggles() {
     columnCheckboxes.innerHTML = '';
 
     allHeaders.forEach(header => {
+        if (header === SELECT_COLUMN) return;
         const label = document.createElement('label');
         label.className = 'column-checkbox-label';
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.checked = visibleColumns.includes(header);
+        checkbox.dataset.column = header;
         checkbox.addEventListener('change', () => toggleColumn(header, checkbox.checked));
 
         label.appendChild(checkbox);
@@ -587,14 +1249,66 @@ function populateColumnToggles() {
 
 // Toggle column visibility
 function toggleColumn(columnName, isVisible) {
-    if (isVisible && !visibleColumns.includes(columnName)) {
-        visibleColumns.push(columnName);
+    let next = [...visibleColumns];
+    if (isVisible && !next.includes(columnName)) {
+        next.push(columnName);
     } else if (!isVisible) {
-        visibleColumns = visibleColumns.filter(col => col !== columnName);
+        next = next.filter(col => col !== columnName);
     }
 
+    setVisibleColumns(next);
+    announce(`${columnName} column ${isVisible ? 'shown' : 'hidden'}.`);
+}
+
+function setVisibleColumns(columns) {
+    visibleColumns = columns.filter(Boolean);
     headers = visibleColumns;
     displayData(currentData);
+    syncColumnCheckboxes();
+}
+
+function toggleColumnPanel(forceState, skipFocus = false) {
+    const isCurrentlyVisible = columnTogglePanel.style.display === 'block';
+    const shouldShow = typeof forceState === 'boolean' ? forceState : !isCurrentlyVisible;
+
+    columnTogglePanel.style.display = shouldShow ? 'block' : 'none';
+    columnTogglePanel.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+    columnToggleBtn.setAttribute('aria-expanded', shouldShow ? 'true' : 'false');
+
+    if (!skipFocus) {
+        if (shouldShow) {
+            const firstCheckbox = columnCheckboxes.querySelector('input[type=\"checkbox\"]');
+            if (firstCheckbox) firstCheckbox.focus();
+        } else {
+            columnToggleBtn.focus();
+        }
+    }
+}
+
+function syncColumnCheckboxes() {
+    if (!columnCheckboxes) return;
+    columnCheckboxes.querySelectorAll('input[type="checkbox"]').forEach(input => {
+        const name = input.dataset.column;
+        if (!name) return;
+        input.checked = visibleColumns.includes(name);
+    });
+}
+
+function applyCompactPreset() {
+    if (!currentSheet || !allSheetsData[currentSheet]) return;
+    const preset = COLUMN_PRESETS[currentSheet] || COLUMN_PRESETS['default'];
+    const presetSet = new Set([SELECT_COLUMN, 'Favorite', ...preset]);
+    const next = allHeaders.filter(col => presetSet.has(col));
+    if (next.length) {
+        setVisibleColumns(next);
+        announce(`Applied compact columns for ${currentSheet}.`);
+    }
+}
+
+function showAllColumns() {
+    if (!allHeaders || !allHeaders.length) return;
+    setVisibleColumns([...allHeaders]);
+    announce('Showing all columns.');
 }
 
 // Update filter visibility based on selected sheet
@@ -613,15 +1327,99 @@ function updateFilterVisibility() {
         diyFilter.value = '';
         catalogFilter.value = '';
     }
+    updateMobileFilterSummary();
+}
+
+function escapeHTML(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function highlightText(text, query) {
+    if (!query) return escapeHTML(text || '');
+    const words = query.split(/\s+/).filter(Boolean);
+    if (!words.length) return escapeHTML(text || '');
+    let result = escapeHTML(text || '');
+    words.forEach(word => {
+        const regex = new RegExp(`(${word.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')})`, 'ig');
+        result = result.replace(regex, '<mark>$1</mark>');
+    });
+    return result;
+}
+
+// Make table cells keyboard and screen-reader friendly for expand/collapse
+function makeCellExpandable(td, headerLabel) {
+    const label = headerLabel || 'Cell';
+    td.classList.add('expandable-cell');
+    td.setAttribute('role', 'button');
+    td.setAttribute('tabindex', '0');
+    td.setAttribute('aria-expanded', 'false');
+    td.setAttribute('aria-describedby', 'cellExpandHelp');
+    td.title = 'Press Enter or Space to expand';
+
+    const toggleExpand = () => {
+        const isExpanded = td.classList.toggle('expanded');
+        td.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+        announce(`${label} ${isExpanded ? 'expanded' : 'collapsed'}.`);
+    };
+
+    const autoExpand = () => td.classList.add('expanded-auto');
+    const collapse = () => td.classList.remove('expanded-auto');
+
+    td.addEventListener('focus', autoExpand);
+    td.addEventListener('blur', collapse);
+    td.addEventListener('mouseenter', autoExpand);
+    td.addEventListener('mouseleave', collapse);
+
+    td.addEventListener('click', toggleExpand);
+    td.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleExpand();
+        }
+    });
+}
+
+function buildFavoriteButton(row) {
+    const isFav = isFavorite(row);
+    const btn = document.createElement('button');
+    btn.className = `favorite-btn${isFav ? ' active' : ''}`;
+    btn.textContent = isFav ? '\u2605' : '\u2606';
+    btn.setAttribute('aria-label', `${isFav ? 'Remove' : 'Add'} ${row.Name || 'item'} ${isFav ? 'from' : 'to'} favorites`);
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleFavorite(row);
+    });
+    return btn;
 }
 
 // Display data in table with pagination
 function displayData(data, isMultiSheet = false) {
     if (data.length === 0 || headers.length === 0) {
-        resultsSection.style.display = 'none';
+        selectedRowKeys = new Set();
+        updateSelectionSummary();
+        if (resultsHeader) {
+            resultsHeader.classList.remove('show');
+            resultsHeader.setAttribute('aria-hidden', 'true');
+        }
+        if (scrollHint) scrollHint.classList.remove('visible');
+        if (resultsSection) {
+            resultsSection.classList.add('results-hidden');
+        }
+        if (cardsContainer) cardsContainer.style.display = 'none';
+        if (tableContainer) tableContainer.style.display = 'none';
+        recordMeta = { total: data.length, showing: 0, start: 0, end: 0 };
+        updateRecordCount();
+        updateInsights([]);
 
         // Determine which empty state to show
-        if (!currentSheet) {
+        if (favoritesOnly) {
+            showEmptyState('noFavorites');
+        } else if (!currentSheet) {
             showEmptyState('noSheet');
         } else if (searchInput.value.trim().length > 0 || diyFilter.value || catalogFilter.value) {
             showEmptyState('noResults');
@@ -634,22 +1432,48 @@ function displayData(data, isMultiSheet = false) {
     // Hide empty state when we have data
     hideEmptyState();
 
+    let selectAllCheckbox = null;
+
     // Create table headers with sorting
     tableHead.innerHTML = '';
     const headerRow = document.createElement('tr');
     headers.forEach(header => {
         const th = document.createElement('th');
-        th.textContent = header;
-        th.title = `Click to sort by ${header}`;
-        th.className = 'sortable';
 
-        // Add sort indicators
-        if (sortColumn === header) {
-            th.classList.add(sortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+        if (header === SELECT_COLUMN) {
+            selectAllCheckbox = document.createElement('input');
+            selectAllCheckbox.type = 'checkbox';
+            selectAllCheckbox.title = 'Select all rows on this page';
+            selectAllCheckbox.className = 'select-all-checkbox';
+            th.appendChild(selectAllCheckbox);
+            th.classList.add('select-header');
+            th.setAttribute('role', 'columnheader');
+            th.setAttribute('aria-label', 'Select all rows on this page');
+        } else {
+            th.textContent = header === 'Favorite' ? '\u2605' : header;
+            th.title = header === 'Favorite' ? 'Sort by favorites' : `Click to sort by ${header}`;
+            th.className = 'sortable';
+            th.tabIndex = 0;
+            th.setAttribute('role', 'columnheader');
+            th.setAttribute('aria-label', `${header} column, sortable`);
+
+            // Add sort indicators
+            if (sortColumn === header) {
+                th.classList.add(sortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+                th.setAttribute('aria-sort', sortDirection === 'asc' ? 'ascending' : 'descending');
+            } else {
+                th.setAttribute('aria-sort', 'none');
+            }
+
+            // Add click handler for sorting
+            th.addEventListener('click', () => sortBy(header, isMultiSheet));
+            th.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    sortBy(header, isMultiSheet);
+                }
+            });
         }
-
-        // Add click handler for sorting
-        th.addEventListener('click', () => sortBy(header, isMultiSheet));
 
         headerRow.appendChild(th);
     });
@@ -662,96 +1486,208 @@ function displayData(data, isMultiSheet = false) {
 
     // Create table rows with optional grouping by sheet
     tableBody.innerHTML = '';
+    if (cardGrid) cardGrid.innerHTML = '';
 
-    if (isMultiSheet) {
-        // Group by sheet for visual separation
+    const pageRowKeys = [];
+
+    const renderTableRow = (row) => {
+        const tr = document.createElement('tr');
+        const rowKey = rowSelectionKey(row);
+        pageRowKeys.push(rowKey);
+        headers.forEach(header => {
+            const td = document.createElement('td');
+            let value = row[header] || '';
+
+            if (header === SELECT_COLUMN) {
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'row-select';
+                checkbox.checked = selectedRowKeys.has(rowKey);
+                checkbox.addEventListener('click', (e) => e.stopPropagation());
+                checkbox.addEventListener('change', () => {
+                    if (checkbox.checked) {
+                        selectedRowKeys.add(rowKey);
+                    } else {
+                        selectedRowKeys.delete(rowKey);
+                    }
+                    updateSelectionSummary();
+                });
+                td.appendChild(checkbox);
+            } else if (header === 'Favorite') {
+                td.appendChild(buildFavoriteButton(row));
+                td.className = 'favorite-cell';
+            } else if (header === 'Sheet') {
+                value = row._sheet || '';
+                td.textContent = value;
+                makeCellExpandable(td, header);
+            } else if (header === 'Image' && value && value.startsWith('http')) {
+                const img = document.createElement('img');
+                img.src = value;
+                img.alt = row['Name'] || 'Image';
+                img.className = 'item-image';
+                img.loading = 'lazy';
+                td.appendChild(img);
+                td.className = 'image-cell';
+            } else {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'cell-inner';
+                const textSpan = document.createElement('span');
+                textSpan.className = 'cell-text';
+                if (header === 'Name') {
+                    textSpan.classList.add('name-cell');
+                }
+                textSpan.innerHTML = highlightText(value, lastQuery);
+                wrapper.appendChild(textSpan);
+
+                if (value !== undefined && value !== null && value !== '') {
+                    const copyBtn = document.createElement('button');
+                    copyBtn.type = 'button';
+                    copyBtn.className = 'copy-cell-btn';
+                    copyBtn.title = 'Copy cell';
+                    copyBtn.setAttribute('aria-label', `Copy ${header} value`);
+                    copyBtn.textContent = '\u2398'; // copy icon
+                    copyBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(String(value)).then(() => announce(`${header} copied`)).catch(() => {});
+                    });
+                    wrapper.appendChild(copyBtn);
+                }
+
+                td.appendChild(wrapper);
+                makeCellExpandable(td, header);
+            }
+
+            tr.appendChild(td);
+        });
+        tableBody.appendChild(tr);
+    };
+
+    if (viewMode === 'cards' && cardGrid) {
+        renderCards(paginatedData, isMultiSheet);
+    } else if (isMultiSheet) {
         let currentSheetName = null;
-
         paginatedData.forEach(row => {
-            // Add sheet separator row if sheet changed
             if (row._sheet !== currentSheetName) {
                 currentSheetName = row._sheet;
                 const separatorRow = document.createElement('tr');
                 separatorRow.className = 'sheet-separator';
                 const separatorCell = document.createElement('td');
                 separatorCell.colSpan = headers.length;
-                separatorCell.textContent = `── ${currentSheetName} ──`;
+                separatorCell.textContent = `-- ${currentSheetName} --`;
                 separatorRow.appendChild(separatorCell);
                 tableBody.appendChild(separatorRow);
             }
-
-            const tr = document.createElement('tr');
-            headers.forEach(header => {
-                const td = document.createElement('td');
-                let value;
-
-                // Handle special "Sheet" column
-                if (header === 'Sheet') {
-                    value = row._sheet || '';
-                } else {
-                    value = row[header] || '';
-                }
-
-                // Special handling for Image column
-                if (header === 'Image' && value && value.startsWith('http')) {
-                    const img = document.createElement('img');
-                    img.src = value;
-                    img.alt = row['Name'] || 'Image';
-                    img.className = 'item-image';
-                    img.loading = 'lazy';
-                    td.appendChild(img);
-                    td.className = 'image-cell';
-                } else {
-                    td.textContent = value;
-                    td.title = 'Click to expand';
-
-                    // Click to expand/collapse
-                    td.addEventListener('click', function() {
-                        this.classList.toggle('expanded');
-                    });
-                }
-
-                tr.appendChild(td);
-            });
-            tableBody.appendChild(tr);
+            renderTableRow(row);
         });
     } else {
-        // Normal single-sheet display
-        paginatedData.forEach(row => {
-            const tr = document.createElement('tr');
-            headers.forEach(header => {
-                const td = document.createElement('td');
-                const value = row[header] || '';
+        paginatedData.forEach(renderTableRow);
+    }
 
-                // Special handling for Image column
-                if (header === 'Image' && value && value.startsWith('http')) {
-                    const img = document.createElement('img');
-                    img.src = value;
-                    img.alt = row['Name'] || 'Image';
-                    img.className = 'item-image';
-                    img.loading = 'lazy';
-                    td.appendChild(img);
-                    td.className = 'image-cell';
-                } else {
-                    td.textContent = value;
-                    td.title = 'Click to expand';
-
-                    // Click to expand/collapse
-                    td.addEventListener('click', function() {
-                        this.classList.toggle('expanded');
-                    });
-                }
-
-                tr.appendChild(td);
-            });
-            tableBody.appendChild(tr);
+    // Hook up select-all for current page
+    if (selectAllCheckbox) {
+        selectAllCheckbox.checked = pageRowKeys.length > 0 && pageRowKeys.every(key => selectedRowKeys.has(key));
+        selectAllCheckbox.addEventListener('change', () => {
+            if (selectAllCheckbox.checked) {
+                pageRowKeys.forEach(key => selectedRowKeys.add(key));
+            } else {
+                pageRowKeys.forEach(key => selectedRowKeys.delete(key));
+            }
+            displayData(currentData, lastIsMultiSheet);
+            updateSelectionSummary();
         });
     }
 
     // Add pagination controls
     renderPagination(data.length);
 
-    resultsSection.style.display = 'block';
+    recordMeta = {
+        total: data.length,
+        showing: paginatedData.length,
+        start: data.length ? startIndex + 1 : 0,
+        end: data.length ? Math.min(endIndex, data.length) : 0
+    };
+    updateRecordCount();
+    updateResultsHeading(isMultiSheet);
+    updateInsights(data);
+
+    if (resultsSection) {
+        resultsSection.classList.remove('results-hidden');
+    }
+    if (viewMode === 'cards') {
+        if (cardsContainer) cardsContainer.style.display = 'block';
+        if (tableContainer) tableContainer.style.display = 'none';
+    } else {
+        if (tableContainer) tableContainer.style.display = 'block';
+        if (cardsContainer) cardsContainer.style.display = 'none';
+    }
+
+    if (tableContainer) {
+        tableContainer.scrollTop = 0;
+        tableContainer.scrollLeft = 0;
+    }
+    requestAnimationFrame(updateScrollHint);
+}
+
+function renderCards(data, isMultiSheet = false) {
+    if (!cardGrid) return;
+    cardGrid.innerHTML = '';
+
+    const infoColumns = headers.filter(h => h !== 'Favorite' && h !== 'Image' && h !== SELECT_COLUMN);
+    data.forEach(row => {
+        const card = document.createElement('article');
+        card.className = 'item-card';
+        if (isFavorite(row)) card.classList.add('favorite');
+
+        // Sheet badge
+        if (isMultiSheet) {
+            const badge = document.createElement('div');
+            badge.className = 'sheet-badge';
+            badge.textContent = row._sheet || '';
+            card.appendChild(badge);
+        }
+
+        // Favorite toggle
+        const favBtn = buildFavoriteButton(row);
+        favBtn.classList.add('card-fav-btn');
+        card.appendChild(favBtn);
+
+        // Image
+        const imgUrl = row['Image'];
+        if (imgUrl && typeof imgUrl === 'string' && imgUrl.startsWith('http')) {
+            const imgWrap = document.createElement('div');
+            imgWrap.className = 'card-image';
+            const img = document.createElement('img');
+            img.src = imgUrl;
+            img.alt = row['Name'] || 'Image';
+            img.loading = 'lazy';
+            imgWrap.appendChild(img);
+            card.appendChild(imgWrap);
+        }
+
+        // Title
+        const title = document.createElement('h3');
+        title.className = 'card-title';
+        title.innerHTML = highlightText(row['Name'] || row['Item'] || 'Untitled', lastQuery);
+        card.appendChild(title);
+
+        // Details
+        const meta = document.createElement('dl');
+        meta.className = 'card-meta';
+
+        infoColumns.slice(0, 6).forEach(col => {
+            const value = row[col];
+            if (!value || col === 'Name' || col === 'Sheet') return;
+            const dt = document.createElement('dt');
+            dt.textContent = col;
+            const dd = document.createElement('dd');
+            dd.innerHTML = highlightText(value, lastQuery);
+            meta.appendChild(dt);
+            meta.appendChild(dd);
+        });
+
+        card.appendChild(meta);
+        cardGrid.appendChild(card);
+    });
 }
 
 // Sort data by column
@@ -766,6 +1702,12 @@ function sortBy(column, isMultiSheet = false) {
 
     currentData.sort((a, b) => {
         let aVal, bVal;
+
+        if (column === 'Favorite') {
+            const aFav = isFavorite(a) ? 1 : 0;
+            const bFav = isFavorite(b) ? 1 : 0;
+            return sortDirection === 'asc' ? aFav - bFav : bFav - aFav;
+        }
 
         // Handle Sheet column specially
         if (column === 'Sheet') {
@@ -794,7 +1736,6 @@ function sortBy(column, isMultiSheet = false) {
 
     currentPage = 1; // Reset to first page
     displayData(currentData, isMultiSheet);
-    updateRecordCount();
 }
 
 // Render pagination controls
@@ -814,13 +1755,12 @@ function renderPagination(totalRecords) {
 
     // Previous button
     const prevBtn = document.createElement('button');
-    prevBtn.textContent = '← Previous';
+    prevBtn.textContent = 'Previous';
     prevBtn.disabled = currentPage === 1;
     prevBtn.addEventListener('click', () => {
         if (currentPage > 1) {
             currentPage--;
-            displayData(currentData);
-            updateRecordCount();
+            displayData(currentData, lastIsMultiSheet);
         }
     });
     paginationDiv.appendChild(prevBtn);
@@ -833,53 +1773,61 @@ function renderPagination(totalRecords) {
 
     // Next button
     const nextBtn = document.createElement('button');
-    nextBtn.textContent = 'Next →';
+    nextBtn.textContent = 'Next';
     nextBtn.disabled = currentPage === totalPages;
     nextBtn.addEventListener('click', () => {
         if (currentPage < totalPages) {
             currentPage++;
-            displayData(currentData);
-            updateRecordCount();
+            displayData(currentData, lastIsMultiSheet);
         }
     });
     paginationDiv.appendChild(nextBtn);
 
-    // Add export button
+    // Add export buttons
     const exportBtn = document.createElement('button');
-    exportBtn.textContent = '📥 Export CSV';
+    exportBtn.textContent = 'Export CSV';
     exportBtn.className = 'export-btn';
     exportBtn.title = 'Export current data to CSV';
     exportBtn.addEventListener('click', exportToCSV);
     paginationDiv.appendChild(exportBtn);
 
+    const exportSelectedBtn = document.createElement('button');
+    exportSelectedBtn.textContent = 'Export Selected';
+    exportSelectedBtn.className = 'export-btn secondary';
+    exportSelectedBtn.title = 'Export only selected rows to CSV';
+    exportSelectedBtn.addEventListener('click', exportSelectedToCSV);
+    paginationDiv.appendChild(exportSelectedBtn);
+
     resultsSection.appendChild(paginationDiv);
 }
 
 // Apply all filters (search + DIY + Catalog)
-async function applyFilters() {
+async function applyFilters(options = {}) {
+    const { suppressLoadingState = false } = options;
     try {
-        const query = searchInput.value.toLowerCase().trim();
+        const query = searchInput.value.trim();
         const diyValue = diyFilter.value;
         const catalogValue = catalogFilter.value;
         const hasSearch = query.length > 0;
         const isGlobalSearch = hasSearch && !currentSheet;
+        const wantsGlobalFavorites = favoritesOnly && !currentSheet && !hasSearch;
+        const wantsGlobalAll = !hasSearch && !currentSheet && !favoritesOnly;
+        const needGlobalData = (!currentSheet && (isGlobalSearch || wantsGlobalFavorites || wantsGlobalAll));
+        lastIsSearch = hasSearch;
+        lastQuery = query;
 
-        if (isGlobalSearch) {
-            await ensureSheetsLoadedForSearch();
+        if (needGlobalData) {
+            await ensureSheetsLoadedForSearch(suppressLoadingState);
         } else if (currentSheet && !allSheetsData[currentSheet]) {
             await loadSheetData(currentSheet);
         }
 
-        if (!hasSearch && (!currentSheet || !allSheetsData[currentSheet])) {
-            currentData = [];
-            allData = [];
-            showEmptyState('noSheet');
-            return;
-        }
-
-        if (Object.keys(allSheetsData).length === 0) {
+        if (!hasSearch && !favoritesOnly && !currentSheet && Object.keys(allSheetsData).length === 0) {
             showEmptyState('welcome');
-            return; // No data loaded
+            recordMeta = { total: 0, showing: 0, start: 0, end: 0 };
+            updateRecordCount();
+            updateInsights([]);
+            return; // No data loaded yet
         }
 
         let combinedData = [];
@@ -893,23 +1841,10 @@ async function applyFilters() {
                 const sheetData = allSheetsData[sheetName];
                 if (!sheetData || !sheetData.data) continue;
 
-                const filteredRows = sheetData.data.filter(row => {
-                    // Search filter
-                    const matchesSearch = Object.values(row).some(value => {
-                        return String(value).toLowerCase().includes(query);
-                    });
-                    if (!matchesSearch) return false;
-
-                    // DIY filter (only if this sheet has DIY column)
-                    if (diyValue && sheetData.headers.includes('DIY') && row['DIY'] !== diyValue) {
-                        return false;
-                    }
-
-                    // Catalog filter (only if this sheet has Catalog column)
-                    if (catalogValue && sheetData.headers.includes('Catalog') && row['Catalog'] !== catalogValue) {
-                        return false;
-                    }
-
+                const searchResults = runSearchOnSheet(sheetName, query);
+                const filteredRows = searchResults.filter(row => {
+                    if (diyValue && sheetData.headers.includes('DIY') && row['DIY'] !== diyValue) return false;
+                    if (catalogValue && sheetData.headers.includes('Catalog') && row['Catalog'] !== catalogValue) return false;
                     return true;
                 });
 
@@ -932,25 +1867,39 @@ async function applyFilters() {
                 });
             }
 
+        } else if (wantsGlobalFavorites || wantsGlobalAll) {
+            const targetSheets = availableSheets;
+            for (const sheetName of targetSheets) {
+                const sheetData = allSheetsData[sheetName];
+                if (!sheetData || !sheetData.data) continue;
+                const filtered = sheetData.data.filter(row => {
+                    if (diyValue && sheetData.headers.includes('DIY') && row['DIY'] !== diyValue) return false;
+                    if (catalogValue && sheetData.headers.includes('Catalog') && row['Catalog'] !== catalogValue) return false;
+                    return true;
+                });
+                combinedData = combinedData.concat(filtered);
+            }
+            isMultiSheet = true;
         } else {
             // No search - show data from currently selected sheet only
             const sheetData = allSheetsData[currentSheet];
-            let filteredRows = sheetData.data.filter(row => {
-                // DIY filter
-                if (diyValue && row['DIY'] !== diyValue) {
-                    return false;
-                }
-
-                // Catalog filter
-                if (catalogValue && row['Catalog'] !== catalogValue) {
-                    return false;
-                }
-
-                return true;
-            });
-
-            combinedData = filteredRows;
+            if (sheetData && sheetData.data) {
+                combinedData = sheetData.data.filter(row => {
+                    if (diyValue && sheetData.headers.includes('DIY') && row['DIY'] !== diyValue) return false;
+                    if (catalogValue && sheetData.headers.includes('Catalog') && row['Catalog'] !== catalogValue) return false;
+                    return true;
+                });
+            }
             isMultiSheet = false;
+        }
+
+        if (favoritesOnly) {
+            combinedData = combinedData.filter(row => isFavorite(row));
+        }
+
+        if (!currentSheet) {
+            const uniqueSheets = new Set(combinedData.map(row => row._sheet));
+            isMultiSheet = uniqueSheets.size > 1;
         }
 
         // Set up headers and visible columns
@@ -958,19 +1907,26 @@ async function applyFilters() {
 
         currentData = combinedData;
         allData = combinedData;
+        pruneSelection();
         currentPage = 1; // Reset to first page
+        lastIsMultiSheet = isMultiSheet;
 
         displayData(currentData, isMultiSheet);
-        updateRecordCount();
 
         // If this was a global search, stop prefetch to avoid background noise
         if (!currentSheet && hasSearch) {
             cancelPrefetch('global search');
         }
+
+        syncUrlState();
+        updateMobileFilterSummary();
     } catch (error) {
         console.error('Error applying filters:', error);
-        showEmptyState('error');
-        updateEmptyStateMessage(error.message || 'Failed to load data. Please try again.');
+        clearGlobalProgress();
+        showEmptyState('error', {
+            title: 'Unable to load data',
+            message: error.message || 'Failed to load data. Please try again.'
+        });
     }
 }
 
@@ -978,34 +1934,36 @@ async function applyFilters() {
 function setupHeadersForDisplay(isMultiSheet, data) {
     if (isMultiSheet) {
         // Multi-sheet results - show common columns plus Sheet column
-        const allHeaders = new Set();
+        const headerSet = new Set();
         data.forEach(row => {
             Object.keys(row).forEach(key => {
                 if (key !== '_sheet') {
-                    allHeaders.add(key);
+                    headerSet.add(key);
                 }
             });
         });
 
         // Prioritize Name and Image, then add Sheet
-        visibleColumns = ['Sheet'];
-        if (allHeaders.has('Name')) visibleColumns.push('Name');
-        if (allHeaders.has('Image')) visibleColumns.push('Image');
+        visibleColumns = [SELECT_COLUMN, 'Favorite', 'Sheet'];
+        if (headerSet.has('Name')) visibleColumns.push('Name');
+        if (headerSet.has('Image')) visibleColumns.push('Image');
 
         // Add other common columns
-        const commonCols = Array.from(allHeaders).filter(h => h !== 'Name' && h !== 'Image');
+        const commonCols = Array.from(headerSet).filter(h => h !== 'Name' && h !== 'Image');
         visibleColumns = visibleColumns.concat(commonCols.slice(0, 8)); // Limit to reasonable number
 
         headers = visibleColumns;
-        allHeaders.clear();
+        allHeaders = [...headers];
+        populateColumnToggles();
 
     } else if (currentSheet && allSheetsData[currentSheet]) {
         // Single sheet - use preset columns
         const sheetData = allSheetsData[currentSheet];
-        allHeaders = sheetData.headers;
+        allHeaders = [SELECT_COLUMN, 'Favorite', ...sheetData.headers];
 
         const preset = COLUMN_PRESETS[currentSheet] || COLUMN_PRESETS['default'];
-        visibleColumns = allHeaders.filter(h => preset.includes(h));
+        const presetWithFav = [SELECT_COLUMN, 'Favorite', ...preset];
+        visibleColumns = allHeaders.filter(h => presetWithFav.includes(h));
 
         if (visibleColumns.length === 0) {
             visibleColumns = allHeaders.slice(0, Math.min(10, allHeaders.length));
@@ -1015,37 +1973,367 @@ function setupHeadersForDisplay(isMultiSheet, data) {
 
         // Populate column toggle UI
         populateColumnToggles();
+    } else if (data && data.length) {
+        // Fallback for global results that only include one sheet
+        const derivedHeaders = Object.keys(data[0]).filter(h => h !== '_sheet');
+        headers = [SELECT_COLUMN, 'Favorite', ...derivedHeaders];
+        visibleColumns = headers;
+        allHeaders = [...headers];
+        populateColumnToggles();
     }
 }
 
 // Update record count
 function updateRecordCount() {
-    // Don't show record count if no sheet is selected
-    if (!currentSheet) {
-        recordCount.style.display = 'none';
+    if (!recordCount) return;
+
+    const hasResults = recordMeta.total > 0;
+    const shouldShow = hasResults || lastIsSearch || !!currentSheet;
+    recordCount.style.display = shouldShow ? 'block' : 'none';
+
+    if (!hasResults) {
+        recordCount.textContent = lastIsSearch ? 'No matches found' : 'No results found';
         return;
     }
 
-    // Show record count when sheet is selected
-    recordCount.style.display = 'block';
+    const context = lastIsSearch ? 'matches' : 'records';
 
-    if (allData.length === 0) {
-        recordCount.textContent = 'No results found';
-    } else if (currentData.length === allData.length) {
-        recordCount.textContent = `Showing all ${allData.length} records`;
+    if (recordMeta.showing >= recordMeta.total) {
+        recordCount.textContent = `Showing all ${recordMeta.total} ${context}`;
     } else {
-        recordCount.textContent = `Showing ${currentData.length} of ${allData.length} records`;
+        recordCount.textContent = `Showing ${recordMeta.start}-${recordMeta.end} of ${recordMeta.total} ${context}`;
     }
+
+    updateSelectionSummary();
+}
+
+function updateSelectionSummary() {
+    if (!selectionCount) return;
+    const count = selectedRowKeys.size;
+    if (count === 0) {
+        selectionCount.textContent = '';
+        selectionCount.style.display = 'none';
+    } else {
+        selectionCount.textContent = `${count} selected`;
+        selectionCount.style.display = 'inline-block';
+    }
+}
+
+function formatNumber(value) {
+    if (value === null || value === undefined || Number.isNaN(value)) return '--';
+    return Number(value).toLocaleString();
+}
+
+function parseNumeric(value) {
+    if (value === null || value === undefined) return null;
+    const cleaned = String(value).replace(/[^0-9.-]/g, '').trim();
+    if (!cleaned) return null;
+    const num = Number(cleaned);
+    return Number.isFinite(num) ? num : null;
+}
+
+function getColumnValues(data, column) {
+    if (!data || !column) return [];
+    const values = [];
+    data.forEach(row => {
+        const value = row[column];
+        if (value === undefined || value === null) return;
+        const normalized = String(value).trim();
+        if (normalized) values.push(normalized);
+    });
+    return values;
+}
+
+function getMostCommon(values) {
+    const counts = new Map();
+    values.forEach(value => {
+        const key = String(value).trim();
+        if (!key) return;
+        counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    let best = null;
+    counts.forEach((count, value) => {
+        if (!best || count > best.count) {
+            best = { value, count };
+        }
+    });
+    return best;
+}
+
+function pickNameColumn(data) {
+    if (!data || !data.length) return null;
+    const row = data[0] || {};
+    for (const col of NAME_COLUMNS) {
+        if (col in row) return col;
+    }
+    const fallback = Object.keys(row).filter(key => key !== '_sheet' && key !== 'Image');
+    return fallback.length ? fallback[0] : null;
+}
+
+function getSpotlight(data) {
+    for (const column of SPOTLIGHT_COLUMNS) {
+        const values = getColumnValues(data, column);
+        if (values.length < 4) continue;
+        const top = getMostCommon(values);
+        if (top && top.count >= 3) {
+            return { column, value: top.value, count: top.count, total: values.length };
+        }
+    }
+    return null;
+}
+
+function getPriceRange(data) {
+    for (const column of PRICE_COLUMNS) {
+        const values = getColumnValues(data, column)
+            .map(parseNumeric)
+            .filter(value => value !== null);
+        if (values.length < 3) continue;
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        return { column, min, max, count: values.length };
+    }
+    return null;
+}
+
+function createFilterChip(label, onClick, options = {}) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = `filter-chip${options.variant ? ` ${options.variant}` : ''}`;
+    chip.setAttribute('aria-label', options.ariaLabel || `Clear ${label}`);
+    const text = document.createElement('span');
+    text.textContent = label;
+    chip.appendChild(text);
+
+    if (onClick) {
+        const close = document.createElement('span');
+        close.className = 'chip-close';
+        close.textContent = 'x';
+        chip.appendChild(close);
+        chip.addEventListener('click', onClick);
+    } else {
+        chip.classList.add('empty');
+        chip.setAttribute('aria-label', label);
+    }
+
+    return chip;
+}
+
+function clearAllFilters() {
+    searchInput.value = '';
+    if (diyFilter) diyFilter.value = '';
+    if (catalogFilter) catalogFilter.value = '';
+    if (currentSheet) {
+        currentSheet = '';
+        sheetSelect.value = '';
+    }
+    if (favoritesOnly) {
+        setFavoritesOnly(false, true);
+    }
+    applyFilters();
+    syncUrlState();
+}
+
+function updateActiveFilterChips() {
+    if (!activeFilters) return;
+    activeFilters.innerHTML = '';
+
+    const chips = [];
+    const query = searchInput.value.trim();
+
+    if (currentSheet) {
+        chips.push(createFilterChip(`Sheet: ${currentSheet}`, () => {
+            currentSheet = '';
+            sheetSelect.value = '';
+            applyFilters();
+            syncUrlState();
+        }));
+    }
+
+    if (query) {
+        chips.push(createFilterChip(`Search: ${query}`, () => {
+            runSearch('');
+            syncUrlState();
+        }));
+    }
+
+    if (diyFilter && diyFilter.value) {
+        chips.push(createFilterChip(`DIY: ${diyFilter.value}`, () => {
+            diyFilter.value = '';
+            applyFilters();
+            syncUrlState();
+        }));
+    }
+
+    if (catalogFilter && catalogFilter.value) {
+        chips.push(createFilterChip(`Catalog: ${catalogFilter.value}`, () => {
+            catalogFilter.value = '';
+            applyFilters();
+            syncUrlState();
+        }));
+    }
+
+    if (favoritesOnly) {
+        chips.push(createFilterChip('Favorites only', () => {
+            setFavoritesOnly(false);
+            syncUrlState();
+        }));
+    }
+
+    if (!chips.length) {
+        activeFilters.appendChild(createFilterChip('No filters applied'));
+        return;
+    }
+
+    chips.forEach(chip => activeFilters.appendChild(chip));
+    activeFilters.appendChild(createFilterChip('Reset all', clearAllFilters, {
+        variant: 'reset',
+        ariaLabel: 'Reset all filters'
+    }));
+}
+
+function updateInsights(data = currentData) {
+    if (!insightRecords || !insightFavorites || !insightSpotlight || !insightValue) {
+        updateActiveFilterChips();
+        return;
+    }
+
+    const total = Array.isArray(data) ? data.length : 0;
+    insightRecords.textContent = total ? formatNumber(total) : '--';
+    if (insightScope) {
+        insightScope.textContent = total
+            ? (currentSheet ? `in ${currentSheet}` : 'across all sheets')
+            : 'Select a sheet to begin';
+    }
+
+    const totalFavorites = favorites.size;
+    insightFavorites.textContent = formatNumber(totalFavorites || 0);
+    if (insightFavoritesSub) {
+        if (!total) {
+            insightFavoritesSub.textContent = totalFavorites ? `${formatNumber(totalFavorites)} saved` : 'Stars you save live here';
+        } else {
+            const favoritesInView = data.filter(row => isFavorite(row)).length;
+            insightFavoritesSub.textContent = `${formatNumber(favoritesInView)} in view`;
+        }
+    }
+
+    if (!total) {
+        if (insightSpotlightLabel) insightSpotlightLabel.textContent = 'Spotlight';
+        if (insightSpotlightSub) insightSpotlightSub.textContent = 'Load data to see trends';
+        insightSpotlight.textContent = '--';
+        if (insightValueLabel) insightValueLabel.textContent = 'Value range';
+        if (insightValueSub) insightValueSub.textContent = 'Waiting for price data';
+        insightValue.textContent = '--';
+        updateActiveFilterChips();
+        return;
+    }
+
+    const spotlight = getSpotlight(data);
+    if (spotlight) {
+        if (insightSpotlightLabel) insightSpotlightLabel.textContent = `Top ${spotlight.column}`;
+        insightSpotlight.textContent = spotlight.value;
+        const pct = Math.round((spotlight.count / total) * 100);
+        if (insightSpotlightSub) insightSpotlightSub.textContent = `${pct}% of visible records`;
+    } else {
+        const nameColumn = pickNameColumn(data);
+        if (nameColumn) {
+            const unique = new Set(getColumnValues(data, nameColumn).map(value => value.toLowerCase())).size;
+            if (insightSpotlightLabel) insightSpotlightLabel.textContent = 'Unique entries';
+            insightSpotlight.textContent = formatNumber(unique);
+            if (insightSpotlightSub) insightSpotlightSub.textContent = nameColumn;
+        } else {
+            if (insightSpotlightLabel) insightSpotlightLabel.textContent = 'Spotlight';
+            insightSpotlight.textContent = '--';
+            if (insightSpotlightSub) insightSpotlightSub.textContent = 'No highlight available';
+        }
+    }
+
+    const priceRange = getPriceRange(data);
+    if (priceRange) {
+        if (insightValueLabel) insightValueLabel.textContent = `${priceRange.column} range`;
+        insightValue.textContent = `${formatNumber(priceRange.min)} - ${formatNumber(priceRange.max)}`;
+        if (insightValueSub) insightValueSub.textContent = `${formatNumber(priceRange.count)} prices found`;
+    } else {
+        const diyValues = getColumnValues(data, 'DIY');
+        if (diyValues.length) {
+            const yesCount = diyValues.filter(value => value.toLowerCase() === 'yes').length;
+            const pct = Math.round((yesCount / diyValues.length) * 100);
+            if (insightValueLabel) insightValueLabel.textContent = 'DIY share';
+            insightValue.textContent = `${pct}%`;
+            if (insightValueSub) insightValueSub.textContent = `${yesCount} of ${diyValues.length} items`;
+        } else {
+            const imageValues = getColumnValues(data, 'Image');
+            if (imageValues.length) {
+                const withImages = imageValues.filter(value => value.startsWith('http')).length;
+                const pct = Math.round((withImages / imageValues.length) * 100);
+                if (insightValueLabel) insightValueLabel.textContent = 'Image coverage';
+                insightValue.textContent = `${pct}%`;
+                if (insightValueSub) insightValueSub.textContent = `${withImages} of ${imageValues.length} have images`;
+            } else {
+                if (insightValueLabel) insightValueLabel.textContent = 'Columns detected';
+                const columnCount = Object.keys(data[0] || {}).filter(key => key !== '_sheet').length;
+                insightValue.textContent = formatNumber(columnCount || 0);
+                if (insightValueSub) insightValueSub.textContent = 'Fields in the current view';
+            }
+        }
+    }
+
+    updateActiveFilterChips();
+}
+
+function updateResultsHeading(isMultiSheet) {
+    if (!resultsHeader || !resultsTitle || !resultsSubtitle) return;
+
+    const titleText = currentSheet || 'All Sheets';
+    resultsTitle.textContent = titleText;
+
+    const badges = [];
+    if (favoritesOnly) badges.push('Favorites only');
+    if (lastIsSearch && lastQuery) badges.push(`Search: "${lastQuery}"`);
+    if (diyFilter && diyFilter.value) badges.push(`DIY: ${diyFilter.value}`);
+    if (catalogFilter && catalogFilter.value) badges.push(`Catalog: ${catalogFilter.value}`);
+
+    resultsSubtitle.textContent = badges.join(' • ');
+    resultsSubtitle.style.display = badges.length ? 'inline' : 'none';
+    resultsHeader.classList.add('show');
+    resultsHeader.setAttribute('aria-hidden', 'false');
+}
+
+function updateScrollHint() {
+    if (!scrollHint || !tableContainer) return;
+    const hasOverflow = (tableContainer.scrollWidth - tableContainer.clientWidth) > 12;
+    scrollHint.classList.toggle('visible', hasOverflow);
+}
+
+function pruneSelection() {
+    if (!selectedRowKeys.size || !currentData.length) {
+        selectedRowKeys = new Set();
+        updateSelectionSummary();
+        return;
+    }
+    const next = new Set();
+    currentData.forEach(row => {
+        const key = rowSelectionKey(row);
+        if (selectedRowKeys.has(key)) next.add(key);
+    });
+    selectedRowKeys = next;
+    updateSelectionSummary();
 }
 
 // Show/hide loading indicator
 function showLoading(show) {
-    loading.style.display = show ? 'block' : 'none';
-    if (!show) {
-        resultsSection.style.display = allData.length > 0 ? 'block' : 'none';
+    loading.style.display = show ? 'flex' : 'none';
+    if (show) {
+        if (resultsSection) {
+            resultsSection.classList.add('results-hidden');
+        }
+        if (emptyState) emptyState.style.display = 'none';
     } else {
-        resultsSection.style.display = 'none';
-        emptyState.style.display = 'none';
+        if (resultsSection) {
+            const hasData = allData.length > 0;
+            if (hasData) {
+                resultsSection.classList.remove('results-hidden');
+            }
+        }
     }
 }
 
@@ -1058,7 +2346,7 @@ function updateEmptyState(type = 'welcome', overrides = {}) {
                 <polyline points="9 22 9 12 15 12 15 22"></polyline>
             </svg>`,
             title: 'Welcome to ACNH Database!',
-            message: 'Select a sheet from the dropdown above to explore items, villagers, and more.'
+            message: 'Search across all sheets or choose a sheet to focus your results.'
         },
         noResults: {
             icon: `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -1069,13 +2357,20 @@ function updateEmptyState(type = 'welcome', overrides = {}) {
             title: 'No Items Found',
             message: 'Try adjusting your search terms or filters to find what you\'re looking for.'
         },
+        noFavorites: {
+            icon: `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 21s-6.5-4.35-9-9.5A5.5 5.5 0 0 1 12 5a5.5 5.5 0 0 1 9 6.5C18.5 16.65 12 21 12 21z"></path>
+            </svg>`,
+            title: 'No favorites found',
+            message: 'Tap the ☆ on any item to save it—or clear filters if they are hiding your favorites.'
+        },
         noSheet: {
             icon: `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                 <polyline points="14 2 14 8 20 8"></polyline>
             </svg>`,
-            title: 'No Sheet Selected',
-            message: 'Please select a sheet from the dropdown to view data.'
+            title: 'All Sheets',
+            message: 'You are browsing all sheets. Pick one to focus if you need sheet-only filters.'
         },
         loading: {
             icon: `<div class="spinner"></div>`,
@@ -1119,7 +2414,9 @@ function updateEmptyStateMessage(message) {
 function showEmptyState(type = 'welcome', overrides = {}) {
     updateEmptyState(type, overrides);
     emptyState.style.display = 'block';
-    resultsSection.style.display = 'none';
+    if (resultsSection) {
+        resultsSection.classList.add('results-hidden');
+    }
     loading.style.display = 'none';
 
     // Apply appropriate CSS class for styling
@@ -1130,6 +2427,9 @@ function showEmptyState(type = 'welcome', overrides = {}) {
     } else if (type === 'loading') {
         emptyState.classList.add('loading');
     }
+
+    const liveMessage = `${emptyStateTitle.textContent || ''} ${emptyStateMessage.textContent || ''}`.trim();
+    announce(liveMessage, type === 'error' ? 'assertive' : 'polite');
 }
 
 // Add retry button for error states
@@ -1143,48 +2443,31 @@ function addRetryButton() {
     // Create retry button
     const retryBtn = document.createElement('button');
     retryBtn.id = 'retryButton';
-    retryBtn.textContent = '🔄 Retry';
+    retryBtn.textContent = 'Retry';
     retryBtn.className = 'retry-btn';
-    retryBtn.style.marginTop = '20px';
-    retryBtn.style.padding = '12px 30px';
-    retryBtn.style.fontSize = '16px';
-    retryBtn.style.fontWeight = '600';
-    retryBtn.style.border = 'none';
-    retryBtn.style.borderRadius = '10px';
-    retryBtn.style.cursor = 'pointer';
-    retryBtn.style.background = '#667eea';
-    retryBtn.style.color = 'white';
-    retryBtn.style.transition = 'all 0.3s';
 
     retryBtn.addEventListener('click', async () => {
         retryBtn.disabled = true;
         retryBtn.textContent = 'Retrying...';
         await loadAvailableSheets();
         retryBtn.disabled = false;
-        retryBtn.textContent = '🔄 Retry';
+        retryBtn.textContent = 'Retry';
     });
 
-    retryBtn.addEventListener('mouseenter', () => {
-        retryBtn.style.background = '#5568d3';
-        retryBtn.style.transform = 'translateY(-2px)';
-    });
-
-    retryBtn.addEventListener('mouseleave', () => {
-        retryBtn.style.background = '#667eea';
-        retryBtn.style.transform = 'translateY(0)';
-    });
-
-    // Append to empty state content
     const emptyStateContent = document.querySelector('.empty-state-content');
     if (emptyStateContent) {
         emptyStateContent.appendChild(retryBtn);
     }
 }
 
+
 // Hide empty state
 function hideEmptyState() {
     emptyState.style.display = 'none';
     emptyState.className = 'empty-state';
+    if (resultsSection) {
+        resultsSection.classList.remove('results-hidden');
+    }
 }
 
 // Prefetch queue to load additional sheets in the background
@@ -1262,11 +2545,12 @@ function exportToCSV() {
     let csv = '';
 
     // Add headers
-    csv += headers.map(h => `"${h}"`).join(',') + '\n';
+    const exportHeaders = headers.filter(h => h !== SELECT_COLUMN);
+    csv += exportHeaders.map(h => `"${h}"`).join(',') + '\n';
 
     // Add data rows
     currentData.forEach(row => {
-        const values = headers.map(header => {
+        const values = exportHeaders.map(header => {
             const value = String(row[header] || '').replace(/"/g, '""');
             return `"${value}"`;
         });
@@ -1281,6 +2565,37 @@ function exportToCSV() {
     const sheetName = sheetSelect.value || 'data';
     link.setAttribute('href', url);
     link.setAttribute('download', `acnh_${sheetName.replace(/\s+/g, '_')}_${Date.now()}.csv`);
+    link.style.visibility = 'hidden';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function exportSelectedToCSV() {
+    const exportHeaders = headers.filter(h => h !== SELECT_COLUMN);
+    const selectedRows = currentData.filter(row => selectedRowKeys.has(rowSelectionKey(row)));
+    if (!selectedRows.length) {
+        alert('No selected rows to export.');
+        return;
+    }
+
+    let csv = '';
+    csv += exportHeaders.map(h => `"${h}"`).join(',') + '\n';
+    selectedRows.forEach(row => {
+        const values = exportHeaders.map(header => {
+            const value = String(row[header] || '').replace(/"/g, '""');
+            return `"${value}"`;
+        });
+        csv += values.join(',') + '\n';
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    const sheetName = sheetSelect.value || 'data';
+    link.setAttribute('href', url);
+    link.setAttribute('download', `acnh_selected_${sheetName.replace(/\s+/g, '_')}_${Date.now()}.csv`);
     link.style.visibility = 'hidden';
 
     document.body.appendChild(link);

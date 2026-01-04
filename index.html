@@ -4,115 +4,191 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ACNH Item Database Search</title>
+    <meta name="description" content="Search and explore all Animal Crossing: New Horizons items, villagers, recipes, and more with fast filters, favorites, and exports.">
+    <meta name="keywords" content="animal crossing,new horizons,acnh,items,database,villagers,recipes,tools,furniture">
+    <meta name="theme-color" content="#1c7c54">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="ACNH Item Database">
+    <meta property="og:description" content="Complete searchable ACNH item database with filters, favorites, and CSV export.">
+    <meta property="og:image" content="preview.png">
+    <meta property="og:image:alt" content="ACNH Item Database preview">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="ACNH Item Database">
+    <meta name="twitter:description" content="Search and explore all ACNH items with filters, favorites, and exports.">
+    <meta name="twitter:image" content="preview.png">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
+    <a href="#mainContent" class="skip-link">Skip to main content</a>
+    <div id="liveRegion" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+    <div class="container" id="mainContent">
         <header>
             <h1>Animal Crossing: New Horizons Item Database</h1>
             <p class="subtitle">Search and explore all ACNH items, villagers, and more</p>
+            <div class="hero-ribbon" aria-label="Feature highlights">
+                <span class="ribbon-pill">Live community data</span>
+                <span class="ribbon-pill">Instant filters</span>
+                <span class="ribbon-pill">Favorites ready</span>
+            </div>
         </header>
 
-        <div class="search-section">
-            <div class="api-key-section" id="apiKeySection">
-                <label for="apiKeyInput" class="api-key-label">Google Sheets API Key:</label>
-                <input type="password" id="apiKeyInput" placeholder="Enter your API key here">
-                <button id="saveApiKeyBtn">Save API Key</button>
-                <span id="apiKeyStatus"></span>
+    <div class="search-section">
+        <div class="api-key-section" id="apiKeySection">
+            <label for="apiKeyInput" class="api-key-label">Google Sheets API Key:</label>
+            <input type="password" id="apiKeyInput" placeholder="Enter your API key here" aria-label="Google Sheets API key">
+            <button id="saveApiKeyBtn" aria-label="Save API key">Save API Key</button>
+            <span id="apiKeyStatus"></span>
             </div>
 
-            <div class="search-box">
-                <input type="text" id="searchInput" placeholder="Search for items, villagers, or anything...">
-            </div>
+            <div class="controls-row">
+                <div class="search-row">
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="Search for items, villagers, or anything... (press Enter to search)" aria-label="Search items across sheets" autocomplete="off">
+                        <div id="searchAssist" class="search-assist" role="listbox" aria-label="Search suggestions and history"></div>
+                    </div>
+                    <button id="favoritesToggleBtn" aria-label="Show favorites only" aria-pressed="false" class="pill-btn">Favorites</button>
+                </div>
 
-            <div class="filters">
-                <select id="sheetSelect">
-                    <option value="">Loading sheets...</option>
-                </select>
+                <div class="filters" id="filtersPanel" tabindex="-1" aria-label="Filters and columns">
+                    <select id="sheetSelect" aria-label="Sheet selector">
+                        <option value="">Loading sheets...</option>
+                    </select>
 
-                <button id="refreshBtn" title="Reload current sheet">↻ Refresh</button>
+                    <select id="diyFilter" aria-label="DIY filter">
+                        <option value="">DIY: All</option>
+                        <option value="Yes">DIY: Yes</option>
+                        <option value="No">DIY: No</option>
+                    </select>
 
-                <select id="diyFilter">
-                    <option value="">DIY: All</option>
-                    <option value="Yes">DIY: Yes</option>
-                    <option value="No">DIY: No</option>
-                </select>
+                    <select id="catalogFilter" aria-label="Catalog filter">
+                        <option value="">Catalog: All</option>
+                        <option value="For sale">For sale</option>
+                        <option value="Not for sale">Not for sale</option>
+                        <option value="Not in catalog">Not in catalog</option>
+                    </select>
 
-                <select id="catalogFilter">
-                    <option value="">Catalog: All</option>
-                    <option value="For sale">For sale</option>
-                    <option value="Not for sale">Not for sale</option>
-                    <option value="Not in catalog">Not in catalog</option>
-                </select>
-
-                <button id="columnToggleBtn">📋 Columns</button>
+                    <button id="columnToggleBtn" aria-label="Toggle column visibility" aria-expanded="false" aria-controls="columnTogglePanel">Columns</button>
+                    <button id="viewToggleBtn" aria-label="Toggle between table and card view" aria-pressed="false" class="pill-btn">Card view</button>
+                </div>
             </div>
 
             <div class="stats">
-                <span id="recordCount">No data loaded</span>
+                <span id="recordCount" aria-live="polite">No data loaded</span>
+                <span id="selectionCount" aria-live="polite" class="selection-count"></span>
             </div>
 
-            <div class="column-toggle-panel" id="columnTogglePanel" style="display: none;">
+            <div class="insights-panel" id="insightsPanel" aria-live="polite">
+                <div class="insight-card primary">
+                    <div class="insight-label">Records</div>
+                    <div class="insight-value" id="insightRecords">--</div>
+                    <div class="insight-sub" id="insightScope">Select a sheet to begin</div>
+                </div>
+                <div class="insight-card">
+                    <div class="insight-label">Favorites</div>
+                    <div class="insight-value" id="insightFavorites">0</div>
+                    <div class="insight-sub" id="insightFavoritesSub">Stars you save live here</div>
+                </div>
+                <div class="insight-card">
+                    <div class="insight-label" id="insightSpotlightLabel">Spotlight</div>
+                    <div class="insight-value" id="insightSpotlight">--</div>
+                    <div class="insight-sub" id="insightSpotlightSub">Load data to see trends</div>
+                </div>
+                <div class="insight-card">
+                    <div class="insight-label" id="insightValueLabel">Value range</div>
+                    <div class="insight-value" id="insightValue">--</div>
+                    <div class="insight-sub" id="insightValueSub">Waiting for price data</div>
+                </div>
+                <div class="insight-card wide">
+                    <div class="insight-label">Active filters</div>
+                    <div class="chip-row" id="activeFilters"></div>
+                </div>
+            </div>
+
+            <div class="column-toggle-panel" id="columnTogglePanel" style="display: none;" role="region" aria-label="Column visibility panel" aria-hidden="true">
                 <div class="column-toggle-header">
                     <h3>Show/Hide Columns</h3>
-                    <button id="closeColumnToggle">✕</button>
+                    <button id="closeColumnToggle" aria-label="Close column panel">X</button>
+                </div>
+                <div class="column-toggle-actions">
+                    <button type="button" id="compactColumnsBtn">Compact preset</button>
+                    <button type="button" id="showAllColumnsBtn">Show all</button>
                 </div>
                 <div id="columnCheckboxes"></div>
             </div>
         </div>
 
-        <div class="loading" id="loading" style="display: none;">
-            <div class="spinner"></div>
-            <p>Loading data...</p>
-        </div>
+        <div class="content-area">
+            <div class="loading overlay-layer" id="loading" style="display: none;">
+                <div class="spinner" role="status" aria-label="Loading"></div>
+                <p>Loading data...</p>
+            </div>
 
-        <!-- Empty State -->
-        <div class="empty-state" id="emptyState" style="display: none;">
-            <div class="empty-state-content">
-                <div class="empty-state-icon" id="emptyStateIcon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                    </svg>
-                </div>
-                <h2 id="emptyStateTitle">Welcome to ACNH Database!</h2>
-                <p id="emptyStateMessage">Select a sheet from the dropdown above to explore items, villagers, and more.</p>
-                <div class="empty-state-hints">
-                    <div class="hint-item">
-                        <span class="hint-icon">🔍</span>
-                        <span>Use the search bar to find items across all sheets</span>
+            <!-- Empty State -->
+            <div class="empty-state overlay-layer" id="emptyState" style="display: none;">
+                <div class="empty-state-content">
+                    <div class="empty-state-icon" id="emptyStateIcon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                        </svg>
                     </div>
-                    <div class="hint-item">
-                        <span class="hint-icon">📋</span>
-                        <span>Click the Columns button to customize your view</span>
+                    <h2 id="emptyStateTitle">Welcome to ACNH Database!</h2>
+                    <p id="emptyStateMessage">Select a sheet from the dropdown above to explore items, villagers, and more.</p>
+                    <div class="progress" id="globalProgress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-hidden="true">
+                        <div class="progress-bar" id="progressBar"></div>
                     </div>
-                    <div class="hint-item">
-                        <span class="hint-icon">📥</span>
-                        <span>Export your filtered results to CSV</span>
+                    <div class="empty-state-hints">
+                        <div class="hint-item">
+                            <span class="hint-icon">*</span>
+                            <span>Use the search bar to find items across all sheets</span>
+                        </div>
+                        <div class="hint-item">
+                            <span class="hint-icon">*</span>
+                            <span>Click the Columns button to customize your view</span>
+                        </div>
+                        <div class="hint-item">
+                            <span class="hint-icon">*</span>
+                            <span>Export your filtered results to CSV</span>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="results-section" id="resultsSection" style="display: none;">
-            <div class="table-container">
-                <table id="dataTable">
-                    <thead id="tableHead">
-                        <tr></tr>
-                    </thead>
-                    <tbody id="tableBody">
-                    </tbody>
-                </table>
+            <div class="results-section results-hidden" id="resultsSection">
+                <div class="results-header" id="resultsHeader">
+                    <h2 id="resultsTitle">All Sheets</h2>
+                    <span id="resultsSubtitle"></span>
+                </div>
+                <div class="table-container">
+                    <div class="scroll-hint" id="scrollHint">↔ Scroll horizontally to see all columns</div>
+                    <table id="dataTable">
+                        <thead id="tableHead">
+                            <tr></tr>
+                        </thead>
+                        <tbody id="tableBody">
+                        </tbody>
+                    </table>
+                    <div id="cellExpandHelp" class="sr-only">Press Enter or Space to expand cell content; press again to collapse.</div>
+                </div>
+                <div class="cards-container" id="cardsContainer" style="display: none;">
+                    <div id="cardGrid" class="card-grid"></div>
+                </div>
             </div>
         </div>
 
         <footer>
-            <p>Data source: <a href="https://docs.google.com/spreadsheets/d/13d_LAJPlxMa_DubPTuirkIV4DERBMXbrWQsmSh8ReK4/edit" target="_blank">ACNH Spreadsheet</a></p>
+            <p>Data source: <a href="https://docs.google.com/spreadsheets/d/13d_LAJPlxMa_DubPTuirkIV4DERBMXbrWQsmSh8ReK4/edit" target="_blank" rel="noreferrer">ACNH Spreadsheet</a></p>
             <p>This is a community-maintained database for Animal Crossing: New Horizons</p>
         </footer>
     </div>
 
     <script src="config/default-api-key.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0"></script>
     <script src="script.js"></script>
 </body>
 </html>
