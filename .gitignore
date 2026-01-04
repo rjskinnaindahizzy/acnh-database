@@ -4,3 +4,4 @@ config/default-api-key.js
 .claude/*
 test-scripts/*
 node_modules/
+.jules/*
