@@ -200,12 +200,43 @@ function setupEventListeners() {
     catalogFilter.addEventListener('change', applyFilters);
 
     // Column toggle
-    columnToggleBtn.addEventListener('click', () => {
-        columnTogglePanel.style.display = columnTogglePanel.style.display === 'none' ? 'block' : 'none';
+    columnToggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent closing immediately
+        const isHidden = columnTogglePanel.style.display === 'none';
+        columnTogglePanel.style.display = isHidden ? 'block' : 'none';
+
+        if (isHidden) {
+            // Panel is opening, move focus to close button for accessibility
+            closeColumnToggle.focus();
+        }
     });
 
     closeColumnToggle.addEventListener('click', () => {
         columnTogglePanel.style.display = 'none';
+        // Return focus to the button that opened it
+        columnToggleBtn.focus();
+    });
+
+    // Close column toggle on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && columnTogglePanel.style.display !== 'none') {
+            columnTogglePanel.style.display = 'none';
+            columnToggleBtn.focus();
+        }
+    });
+
+    // Close column toggle when clicking outside
+    document.addEventListener('click', (e) => {
+        if (columnTogglePanel.style.display !== 'none' &&
+            !columnTogglePanel.contains(e.target) &&
+            e.target !== columnToggleBtn) {
+            columnTogglePanel.style.display = 'none';
+        }
+    });
+
+    // Prevent clicks inside panel from closing it
+    columnTogglePanel.addEventListener('click', (e) => {
+        e.stopPropagation();
     });
 
     refreshBtn.addEventListener('click', async () => {
