@@ -900,3 +900,11 @@ td:hover {
 .toast-icon {
     font-size: 18px;
 }
+
+/* Highlight search terms */
+mark {
+    background-color: var(--soft);
+    color: var(--text-dark);
+    padding: 0 2px;
+    border-radius: 2px;
+}

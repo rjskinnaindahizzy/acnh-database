@@ -530,6 +530,38 @@ function isLikelyImageUrl(value) {
     return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(trimmed);
 }
 
+// Helper to escape HTML characters
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+// Helper to escape regex special characters
+function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Highlight search terms in text
+function highlightText(text, query) {
+    if (!query) return escapeHtml(text);
+
+    // Split by the query (case-insensitive) to preserve original casing
+    const regex = new RegExp(`(${escapeRegExp(query)})`, 'gi');
+    const parts = String(text).split(regex);
+
+    return parts.map(part => {
+        if (part.toLowerCase() === query.toLowerCase()) {
+            return `<mark>${escapeHtml(part)}</mark>`;
+        }
+        return escapeHtml(part);
+    }).join('');
+}
+
 // Load data for a single sheet (lazy-loaded)
 async function loadSheetData(sheetName, { forceRefresh = false, showLoading = true } = {}) {
     if (!sheetName) return null;
@@ -818,6 +850,9 @@ function displayData(data, isMultiSheet = false) {
     // Create table rows with optional grouping by sheet
     tableBody.innerHTML = '';
 
+    // Get current search query for highlighting
+    const searchQuery = searchInput.value.trim();
+
     if (isMultiSheet) {
         // Group by sheet for visual separation
         let currentSheetName = null;
@@ -859,7 +894,12 @@ function displayData(data, isMultiSheet = false) {
                     td.appendChild(img);
                     td.className = 'image-cell';
                 } else {
-                    td.textContent = value;
+                    // Highlight search terms if present
+                    if (searchQuery) {
+                        td.innerHTML = highlightText(value, searchQuery);
+                    } else {
+                        td.textContent = value;
+                    }
                     td.title = 'Click to expand';
 
                     // Click to expand/collapse
@@ -892,7 +932,12 @@ function displayData(data, isMultiSheet = false) {
                     td.appendChild(img);
                     td.className = 'image-cell';
                 } else {
-                    td.textContent = value;
+                    // Highlight search terms if present
+                    if (searchQuery) {
+                        td.innerHTML = highlightText(value, searchQuery);
+                    } else {
+                        td.textContent = value;
+                    }
                     td.title = 'Click to expand';
 
                     // Click to expand/collapse
