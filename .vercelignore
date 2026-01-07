@@ -1,0 +1,17 @@
+# Dependencies and build tools
+node_modules/
+.pnpm-store/
+
+# IDE and editor files
+.history/
+.claude/
+.Jules/
+
+# Test files
+test-scripts/
+
+# Config with sensitive data
+config/default-api-key.js
+
+# OS files
+.DS_Store
