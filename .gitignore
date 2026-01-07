@@ -4,3 +4,6 @@ config/default-api-key.js
 .claude/*
 test-scripts/*
 node_modules/
+.pnpm-store/
+.vercel/
+.DS_Store
