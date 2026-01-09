@@ -48,16 +48,16 @@
                     <option value="Not in catalog">Not in catalog</option>
                 </select>
 
-                <button id="columnToggleBtn" aria-label="Toggle columns">📋 Columns</button>
+                <button id="columnToggleBtn" aria-label="Toggle columns" aria-expanded="false" aria-controls="columnTogglePanel" aria-haspopup="dialog">📋 Columns</button>
             </div>
 
             <div class="stats">
                 <span id="recordCount">No data loaded</span>
             </div>
 
-            <div class="column-toggle-panel" id="columnTogglePanel" style="display: none;">
+            <div class="column-toggle-panel" id="columnTogglePanel" style="display: none;" role="dialog" aria-modal="false" aria-labelledby="columnToggleTitle">
                 <div class="column-toggle-header">
-                    <h3>Show/Hide Columns</h3>
+                    <h3 id="columnToggleTitle">Show/Hide Columns</h3>
                     <button id="closeColumnToggle" aria-label="Close column settings">✕</button>
                 </div>
                 <div id="columnCheckboxes"></div>

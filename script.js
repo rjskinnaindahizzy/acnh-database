@@ -205,6 +205,9 @@ function setupEventListeners() {
         const isHidden = columnTogglePanel.style.display === 'none';
         columnTogglePanel.style.display = isHidden ? 'block' : 'none';
 
+        // Update aria-expanded
+        columnToggleBtn.setAttribute('aria-expanded', isHidden);
+
         if (isHidden) {
             // Panel is opening, move focus to close button for accessibility
             closeColumnToggle.focus();
@@ -213,6 +216,7 @@ function setupEventListeners() {
 
     closeColumnToggle.addEventListener('click', () => {
         columnTogglePanel.style.display = 'none';
+        columnToggleBtn.setAttribute('aria-expanded', 'false');
         // Return focus to the button that opened it
         columnToggleBtn.focus();
     });
@@ -221,6 +225,7 @@ function setupEventListeners() {
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && columnTogglePanel.style.display !== 'none') {
             columnTogglePanel.style.display = 'none';
+            columnToggleBtn.setAttribute('aria-expanded', 'false');
             columnToggleBtn.focus();
         }
     });
@@ -231,6 +236,7 @@ function setupEventListeners() {
             !columnTogglePanel.contains(e.target) &&
             e.target !== columnToggleBtn) {
             columnTogglePanel.style.display = 'none';
+            columnToggleBtn.setAttribute('aria-expanded', 'false');
         }
     });
 
