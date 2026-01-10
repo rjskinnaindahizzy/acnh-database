@@ -908,3 +908,32 @@ mark {
     padding: 0 2px;
     border-radius: 2px;
 }
+
+/* Search shortcut hint */
+.search-shortcut {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: #999;
+    pointer-events: none;
+    transition: all 0.2s;
+    user-select: none;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+/* Hide shortcut when input is focused or has content */
+#searchInput:focus ~ .search-shortcut,
+#searchInput:not(:placeholder-shown) ~ .search-shortcut {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.9);
+    pointer-events: none;
+}
