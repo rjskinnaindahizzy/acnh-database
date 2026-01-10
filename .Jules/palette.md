@@ -6,3 +6,7 @@
 ## 2026-01-08 - ARIA State Management
 **Learning:** Toggle buttons must explicitly communicate their state via `aria-expanded`. Without this, screen reader users don't know if the connected panel is open or closed, even if focus moves correctly.
 **Action:** Ensure all toggle interactions update `aria-expanded` on the trigger element in real-time.
+
+## 2026-01-10 - Visual Keyboard Shortcuts
+**Learning:** Embedding keyboard shortcuts in placeholder text (e.g., "Search (Press /)") is often missed by users and disappears when they type. A distinct visual element resembling a key (`<kbd>`) improves discoverability and adds a polished "power user" feel.
+**Action:** Use absolute positioning to place `<kbd>` hints inside input wrappers, and hide them via CSS `:focus-within` or `:placeholder-shown` to avoid visual clutter during interaction.
