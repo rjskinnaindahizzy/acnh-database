@@ -251,7 +251,11 @@ function setupEventListeners() {
             return;
         }
 
+        // UX: Loading state
+        const originalBtnContent = refreshBtn.innerHTML;
         refreshBtn.disabled = true;
+        refreshBtn.innerHTML = '<span class="btn-spinner"></span> Refreshing...';
+
         await clearSheetCache(currentSheet);
         cancelPrefetch('manual refresh');
 
@@ -267,6 +271,7 @@ function setupEventListeners() {
             });
         } finally {
             refreshBtn.disabled = false;
+            refreshBtn.innerHTML = originalBtnContent;
         }
     });
 
