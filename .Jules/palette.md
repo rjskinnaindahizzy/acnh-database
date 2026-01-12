@@ -1,4 +1,3 @@
-
 ## 2024-05-22 - Column Toggle Accessibility
 **Learning:** Interactive popovers (like column toggles) must manage focus and closing behavior to be accessible. Simply toggling `display: none` traps keyboard users and confuses screen readers.
 **Action:** Always implement: 1) Focus management (in on open, return on close), 2) Escape key to close, 3) Click outside to close, 4) ARIA labels for icon-only buttons.
@@ -10,3 +9,7 @@
 ## 2026-01-10 - Visual Keyboard Shortcuts
 **Learning:** Embedding keyboard shortcuts in placeholder text (e.g., "Search (Press /)") is often missed by users and disappears when they type. A distinct visual element resembling a key (`<kbd>`) improves discoverability and adds a polished "power user" feel.
 **Action:** Use absolute positioning to place `<kbd>` hints inside input wrappers, and hide them via CSS `:focus-within` or `:placeholder-shown` to avoid visual clutter during interaction.
+
+## 2026-01-28 - Decoupling Actions from Pagination
+**Learning:** Attaching action buttons (like "Export CSV") to pagination logic can accidentally hide them for small datasets (single page results). Users expect global actions to be available regardless of the result count.
+**Action:** Ensure action buttons are rendered independently of pagination condition checks (e.g., `totalPages > 1`), or placed in a persistent toolbar.

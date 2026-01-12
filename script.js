@@ -1025,48 +1025,53 @@ function renderPagination(totalRecords) {
         paginationDiv.remove();
     }
 
-    if (totalPages <= 1) return; // No pagination needed
+    // Always show container if we have data, so export button is available
+    if (totalRecords === 0) return;
 
     paginationDiv = document.createElement('div');
     paginationDiv.className = 'pagination';
 
-    // Previous button
-    const prevBtn = document.createElement('button');
-    prevBtn.textContent = '← Previous';
-    prevBtn.disabled = currentPage === 1;
-    prevBtn.addEventListener('click', () => {
-        if (currentPage > 1) {
-            currentPage--;
-            displayData(currentData);
-            updateRecordCount();
-        }
-    });
-    paginationDiv.appendChild(prevBtn);
+    // Only show pagination controls if we have multiple pages
+    if (totalPages > 1) {
+        // Previous button
+        const prevBtn = document.createElement('button');
+        prevBtn.textContent = '← Previous';
+        prevBtn.disabled = currentPage === 1;
+        prevBtn.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                displayData(currentData);
+                updateRecordCount();
+            }
+        });
+        paginationDiv.appendChild(prevBtn);
 
-    // Page info
-    const pageInfo = document.createElement('span');
-    pageInfo.className = 'pagination-info';
-    pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
-    paginationDiv.appendChild(pageInfo);
+        // Page info
+        const pageInfo = document.createElement('span');
+        pageInfo.className = 'pagination-info';
+        pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+        paginationDiv.appendChild(pageInfo);
 
-    // Next button
-    const nextBtn = document.createElement('button');
-    nextBtn.textContent = 'Next →';
-    nextBtn.disabled = currentPage === totalPages;
-    nextBtn.addEventListener('click', () => {
-        if (currentPage < totalPages) {
-            currentPage++;
-            displayData(currentData);
-            updateRecordCount();
-        }
-    });
-    paginationDiv.appendChild(nextBtn);
+        // Next button
+        const nextBtn = document.createElement('button');
+        nextBtn.textContent = 'Next →';
+        nextBtn.disabled = currentPage === totalPages;
+        nextBtn.addEventListener('click', () => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                displayData(currentData);
+                updateRecordCount();
+            }
+        });
+        paginationDiv.appendChild(nextBtn);
+    }
 
-    // Add export button
+    // Add export button (always visible when data exists)
     const exportBtn = document.createElement('button');
-    exportBtn.textContent = '📥 Export CSV';
+    exportBtn.innerHTML = '<span role="img" aria-hidden="true">📥</span> Export CSV';
     exportBtn.className = 'export-btn';
     exportBtn.title = 'Export current data to CSV';
+    exportBtn.setAttribute('aria-label', `Export ${totalRecords} records to CSV`);
     exportBtn.addEventListener('click', exportToCSV);
     paginationDiv.appendChild(exportBtn);
 
@@ -1472,38 +1477,45 @@ function showApiKeySection() {
 // Export data to CSV
 function exportToCSV() {
     if (currentData.length === 0) {
-        alert('No data to export');
+        showToast('No data to export', 'error');
         return;
     }
 
-    // Create CSV content
-    let csv = '';
+    try {
+        // Create CSV content
+        let csv = '';
 
-    // Add headers
-    csv += headers.map(h => `"${h}"`).join(',') + '\n';
+        // Add headers
+        csv += headers.map(h => `"${h}"`).join(',') + '\n';
 
-    // Add data rows
-    currentData.forEach(row => {
-        const values = headers.map(header => {
-            const value = String(row[header] || '').replace(/"/g, '""');
-            return `"${value}"`;
+        // Add data rows
+        currentData.forEach(row => {
+            const values = headers.map(header => {
+                const value = String(row[header] || '').replace(/"/g, '""');
+                return `"${value}"`;
+            });
+            csv += values.join(',') + '\n';
         });
-        csv += values.join(',') + '\n';
-    });
 
-    // Create download link
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
+        // Create download link
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
 
-    const sheetName = sheetSelect.value || 'data';
-    link.setAttribute('href', url);
-    link.setAttribute('download', `acnh_${sheetName.replace(/\s+/g, '_')}_${Date.now()}.csv`);
-    link.style.visibility = 'hidden';
+        const sheetName = sheetSelect.value || 'data';
+        link.setAttribute('href', url);
+        link.setAttribute('download', `acnh_${sheetName.replace(/\s+/g, '_')}_${Date.now()}.csv`);
+        link.style.visibility = 'hidden';
 
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showToast(`Exported ${currentData.length} items successfully`, 'success');
+    } catch (error) {
+        console.error('Export failed:', error);
+        showToast('Failed to export data', 'error');
+    }
 }
 
 // Optional: Add a settings button to manage API key (if needed)
