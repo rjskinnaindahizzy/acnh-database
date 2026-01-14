@@ -1568,6 +1568,13 @@ function showToast(message, type = 'default') {
     else if (type === 'error') icon = '✕';
     else icon = 'ℹ';
 
+    // Accessibility: Add roles for screen readers
+    if (type === 'error') {
+        toast.setAttribute('role', 'alert');
+    } else {
+        toast.setAttribute('role', 'status');
+    }
+
     toast.innerHTML = `
         <span class="toast-icon">${icon}</span>
         <span>${message}</span>
