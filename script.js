@@ -25,6 +25,7 @@ let prefetchAbortToken = 0;
 let prefetchInFlight = 0;
 let prefetchRunning = false;
 let shouldFocusSort = false; // Flag to restore focus to sort header
+let shouldFocusPagination = null; // Flag to restore focus to pagination buttons
 const PREFETCH_CONCURRENCY = 2;
 const MOST_USED_SHEETS = [
     'Housewares',
@@ -1059,6 +1060,7 @@ function renderPagination(totalRecords) {
         prevBtn.disabled = currentPage === 1;
         prevBtn.addEventListener('click', () => {
             if (currentPage > 1) {
+                shouldFocusPagination = 'prev';
                 currentPage--;
                 displayData(currentData);
                 updateRecordCount();
@@ -1078,12 +1080,14 @@ function renderPagination(totalRecords) {
         nextBtn.disabled = currentPage === totalPages;
         nextBtn.addEventListener('click', () => {
             if (currentPage < totalPages) {
+                shouldFocusPagination = 'next';
                 currentPage++;
                 displayData(currentData);
                 updateRecordCount();
             }
         });
         paginationDiv.appendChild(nextBtn);
+
     }
 
     // Add export button (always visible when data exists)
@@ -1096,6 +1100,31 @@ function renderPagination(totalRecords) {
     paginationDiv.appendChild(exportBtn);
 
     resultsSection.appendChild(paginationDiv);
+
+    // Restore focus if needed (must be done after appending to DOM)
+    if (shouldFocusPagination && totalPages > 1) {
+        // Find buttons in the new pagination div
+        // We know the structure: Prev is first child, Next is third (Prev, Span, Next, Export)
+        // Safer to find by text content or keeping references
+        const buttons = paginationDiv.querySelectorAll('button');
+        const prevBtn = Array.from(buttons).find(b => b.textContent.includes('Previous'));
+        const nextBtn = Array.from(buttons).find(b => b.textContent.includes('Next'));
+
+        if (shouldFocusPagination === 'next') {
+            if (nextBtn && !nextBtn.disabled) {
+                nextBtn.focus();
+            } else if (prevBtn && !prevBtn.disabled) {
+                prevBtn.focus();
+            }
+        } else if (shouldFocusPagination === 'prev') {
+            if (prevBtn && !prevBtn.disabled) {
+                prevBtn.focus();
+            } else if (nextBtn && !nextBtn.disabled) {
+                nextBtn.focus();
+            }
+        }
+        shouldFocusPagination = null;
+    }
 }
 
 // Apply all filters (search + DIY + Catalog)
