@@ -16,16 +16,21 @@
         <div class="search-section">
             <div class="api-key-section" id="apiKeySection">
                 <label for="apiKeyInput" class="api-key-label">Google Sheets API Key:</label>
-                <input type="password" id="apiKeyInput" placeholder="Enter your API key here">
+                <div class="input-wrapper">
+                    <input type="password" id="apiKeyInput" placeholder="Enter your API key here">
+                    <button id="toggleApiKeyBtn" class="input-action-btn" type="button" aria-label="Show API key">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    </button>
+                </div>
                 <button id="saveApiKeyBtn">Save API Key</button>
                 <span id="apiKeyStatus"></span>
             </div>
 
             <div class="search-box">
-                <div class="search-wrapper">
+                <div class="input-wrapper">
                     <input type="text" id="searchInput" placeholder="Search for items, villagers, or anything..." aria-label="Search items and villagers">
                     <kbd class="search-shortcut" aria-hidden="true">/</kbd>
-                    <button id="searchClearBtn" class="search-clear-btn" aria-label="Clear search" style="display: none;">✕</button>
+                    <button id="searchClearBtn" class="input-action-btn" aria-label="Clear search" style="display: none;">✕</button>
                 </div>
             </div>
 
