@@ -124,6 +124,29 @@ function showFiltersAndControls() {
 function setupEventListeners() {
     saveApiKeyBtn.addEventListener('click', saveApiKey);
 
+    // Back to Top button functionality
+    const backToTopBtn = document.getElementById('backToTopBtn');
+    if (backToTopBtn) {
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 300) {
+                backToTopBtn.classList.add('visible');
+            } else {
+                backToTopBtn.classList.remove('visible');
+            }
+        });
+
+        backToTopBtn.addEventListener('click', () => {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+            // Return focus to search input for better keyboard navigation
+            if (searchInput) {
+                searchInput.focus();
+            }
+        });
+    }
+
     // Toggle API Key visibility
     if (toggleApiKeyBtn) {
         toggleApiKeyBtn.addEventListener('click', () => {
