@@ -1524,10 +1524,25 @@ function showApiKeySection() {
 }
 
 // Export data to CSV
-function exportToCSV() {
+function exportToCSV(e) {
     if (currentData.length === 0) {
         showToast('No data to export', 'error');
         return;
+    }
+
+    // UX: Success feedback on button
+    const btn = e ? e.target.closest('button') : null;
+    let originalContent = '';
+    let originalStyle = '';
+
+    if (btn) {
+        originalContent = btn.innerHTML;
+        originalStyle = btn.getAttribute('style') || '';
+
+        btn.innerHTML = '<span role="img" aria-hidden="true">✓</span> Exported!';
+        btn.style.background = 'var(--success)';
+        btn.style.borderColor = 'var(--success)';
+        btn.disabled = true; // Prevent double clicks
     }
 
     try {
@@ -1564,6 +1579,23 @@ function exportToCSV() {
     } catch (error) {
         console.error('Export failed:', error);
         showToast('Failed to export data', 'error');
+
+        // Reset button immediately on error
+        if (btn) {
+            btn.innerHTML = originalContent;
+            btn.setAttribute('style', originalStyle);
+            btn.disabled = false;
+        }
+        return;
+    }
+
+    // Reset button after delay
+    if (btn) {
+        setTimeout(() => {
+            btn.innerHTML = originalContent;
+            btn.setAttribute('style', originalStyle);
+            btn.disabled = false;
+        }, 2000);
     }
 }
 
