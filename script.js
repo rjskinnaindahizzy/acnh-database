@@ -811,11 +811,26 @@ function displayData(data, isMultiSheet = false) {
     if (data.length === 0 || headers.length === 0) {
         resultsSection.style.display = 'none';
 
+        const query = searchInput.value.trim();
+        const diy = diyFilter.value;
+        const catalog = catalogFilter.value;
+        const hasActiveFilters = query.length > 0 || diy || catalog;
+
         // Determine which empty state to show
-        if (!currentSheet) {
+        if (hasActiveFilters) {
+            // Construct helpful message
+            let message = 'We couldn\'t find any matches';
+            if (query) message += ` for "${escapeHtml(query)}"`;
+            if (diy) message += ` with DIY: ${diy}`;
+            if (catalog) message += ` in Catalog: ${catalog}`;
+            message += '.';
+
+            showEmptyState('noResults', {
+                message: message
+            });
+            addClearSearchButton();
+        } else if (!currentSheet) {
             showEmptyState('noSheet');
-        } else if (searchInput.value.trim().length > 0 || diyFilter.value || catalogFilter.value) {
-            showEmptyState('noResults');
         } else {
             showEmptyState('welcome');
         }
@@ -1378,6 +1393,16 @@ function updateEmptyState(type = 'welcome', overrides = {}) {
     emptyStateIcon.innerHTML = state.icon;
     emptyStateTitle.textContent = state.title;
     emptyStateMessage.textContent = state.message;
+
+    // Manage hints visibility - only show for welcome/initial states
+    const hints = document.querySelector('.empty-state-hints');
+    if (hints) {
+        if (type === 'welcome' || type === 'noSheet') {
+            hints.style.display = 'flex';
+        } else {
+            hints.style.display = 'none';
+        }
+    }
 }
 
 // Helper function to update just the message without changing the entire state
@@ -1406,27 +1431,14 @@ function showEmptyState(type = 'welcome', overrides = {}) {
 
 // Add retry button for error states
 function addRetryButton() {
-    // Remove existing retry button if present
-    const existingBtn = document.getElementById('retryButton');
-    if (existingBtn) {
-        existingBtn.remove();
-    }
+    removeActionButtons();
 
     // Create retry button
     const retryBtn = document.createElement('button');
     retryBtn.id = 'retryButton';
     retryBtn.textContent = '🔄 Retry';
-    retryBtn.className = 'retry-btn';
-    retryBtn.style.marginTop = '20px';
-    retryBtn.style.padding = '12px 30px';
-    retryBtn.style.fontSize = '16px';
-    retryBtn.style.fontWeight = '600';
-    retryBtn.style.border = 'none';
-    retryBtn.style.borderRadius = '10px';
-    retryBtn.style.cursor = 'pointer';
-    retryBtn.style.background = '#667eea';
-    retryBtn.style.color = 'white';
-    retryBtn.style.transition = 'all 0.3s';
+    retryBtn.className = 'action-btn retry-btn';
+    styleActionButton(retryBtn, '#667eea');
 
     retryBtn.addEventListener('click', async () => {
         retryBtn.disabled = true;
@@ -1436,21 +1448,66 @@ function addRetryButton() {
         retryBtn.textContent = '🔄 Retry';
     });
 
-    retryBtn.addEventListener('mouseenter', () => {
-        retryBtn.style.background = '#5568d3';
-        retryBtn.style.transform = 'translateY(-2px)';
-    });
-
-    retryBtn.addEventListener('mouseleave', () => {
-        retryBtn.style.background = '#667eea';
-        retryBtn.style.transform = 'translateY(0)';
-    });
-
     // Append to empty state content
     const emptyStateContent = document.querySelector('.empty-state-content');
     if (emptyStateContent) {
         emptyStateContent.appendChild(retryBtn);
     }
+}
+
+// Add clear search button for no results state
+function addClearSearchButton() {
+    removeActionButtons();
+
+    // Create clear button
+    const clearBtn = document.createElement('button');
+    clearBtn.id = 'clearSearchActionBtn';
+    clearBtn.textContent = '✕ Clear Search & Filters';
+    clearBtn.className = 'action-btn clear-btn';
+    clearBtn.setAttribute('aria-label', 'Clear all search terms and filters');
+    styleActionButton(clearBtn, 'var(--primary)');
+
+    clearBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        diyFilter.value = '';
+        catalogFilter.value = '';
+        updateClearButton();
+        applyFilters();
+    });
+
+    // Append to empty state content
+    const emptyStateContent = document.querySelector('.empty-state-content');
+    if (emptyStateContent) {
+        emptyStateContent.appendChild(clearBtn);
+    }
+}
+
+function removeActionButtons() {
+    const buttons = document.querySelectorAll('.empty-state-content button.action-btn, #retryButton, #clearSearchActionBtn');
+    buttons.forEach(btn => btn.remove());
+}
+
+function styleActionButton(btn, bgColor) {
+    btn.style.marginTop = '20px';
+    btn.style.padding = '12px 30px';
+    btn.style.fontSize = '16px';
+    btn.style.fontWeight = '600';
+    btn.style.border = 'none';
+    btn.style.borderRadius = '10px';
+    btn.style.cursor = 'pointer';
+    btn.style.background = bgColor;
+    btn.style.color = 'white';
+    btn.style.transition = 'all 0.3s';
+
+    btn.addEventListener('mouseenter', () => {
+        btn.style.filter = 'brightness(1.1)';
+        btn.style.transform = 'translateY(-2px)';
+    });
+
+    btn.addEventListener('mouseleave', () => {
+        btn.style.filter = 'none';
+        btn.style.transform = 'translateY(0)';
+    });
 }
 
 // Hide empty state

@@ -9,3 +9,7 @@
 ## 2026-01-19 - [Button Feedback for Sync Actions]
 **Learning:** Even synchronous actions (like client-side CSV export) benefit from "Success" states to confirm user intent and provide closure.
 **Action:** Use temporary state changes (icon + text) on buttons to indicate success, then revert, to give clear feedback without blocking interaction.
+
+## 2026-01-20 - [Empty State Context]
+**Learning:** Generic "No Results" or "No Sheet Selected" messages leave users guessing. Explicitly stating *what* was searched for (e.g., "No matches for 'xyz'") helps users spot typos and confirms the system worked.
+**Action:** Always include the search term and active filters in empty state messages, and provide a direct "Clear Filters" action to recover.
