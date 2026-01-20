@@ -820,7 +820,7 @@ function displayData(data, isMultiSheet = false) {
         if (hasActiveFilters) {
             // Construct helpful message
             let message = 'We couldn\'t find any matches';
-            if (query) message += ` for "${escapeHtml(query)}"`;
+            if (query) message += ` for "${query}"`;
             if (diy) message += ` with DIY: ${diy}`;
             if (catalog) message += ` in Catalog: ${catalog}`;
             message += '.';
