@@ -9,7 +9,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>Animal Crossing: New Horizons Item Database</h1>
+            <h1 tabindex="-1">Animal Crossing: New Horizons Item Database</h1>
             <p class="subtitle">Search and explore all ACNH items, villagers, and more</p>
         </header>
 
@@ -18,12 +18,12 @@
                 <label for="apiKeyInput" class="api-key-label">Google Sheets API Key:</label>
                 <div class="input-wrapper">
                     <input type="password" id="apiKeyInput" placeholder="Enter your API key here">
-                    <button id="toggleApiKeyBtn" class="input-action-btn" type="button" aria-label="Show API key">
+                    <button id="toggleApiKeyBtn" class="input-action-btn" type="button" aria-label="Show API key" title="Show API key">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                     </button>
                 </div>
                 <button id="saveApiKeyBtn">Save API Key</button>
-                <span id="apiKeyStatus"></span>
+                <span id="apiKeyStatus" role="status" aria-live="polite"></span>
             </div>
 
             <div class="search-box">
@@ -88,15 +88,15 @@
                 <p id="emptyStateMessage">Select a sheet from the dropdown above to explore items, villagers, and more.</p>
                 <div class="empty-state-hints">
                     <div class="hint-item">
-                        <span class="hint-icon">🔍</span>
+                        <span class="hint-icon" aria-hidden="true">🔍</span>
                         <span>Use the search bar to find items across all sheets</span>
                     </div>
                     <div class="hint-item">
-                        <span class="hint-icon">📋</span>
+                        <span class="hint-icon" aria-hidden="true">📋</span>
                         <span>Click the Columns button to customize your view</span>
                     </div>
                     <div class="hint-item">
-                        <span class="hint-icon">📥</span>
+                        <span class="hint-icon" aria-hidden="true">📥</span>
                         <span>Export your filtered results to CSV</span>
                     </div>
                 </div>
