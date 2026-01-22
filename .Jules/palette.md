@@ -13,3 +13,7 @@
 ## 2026-01-20 - [Empty State Context]
 **Learning:** Generic "No Results" or "No Sheet Selected" messages leave users guessing. Explicitly stating *what* was searched for (e.g., "No matches for 'xyz'") helps users spot typos and confirms the system worked.
 **Action:** Always include the search term and active filters in empty state messages, and provide a direct "Clear Filters" action to recover.
+
+## 2026-01-21 - [Semantic Hygiene for Icons]
+**Learning:** Decorative icons in text content (like arrows in buttons) are announced by screen readers (e.g., "Left Arrow Previous"), adding noise.
+**Action:** Use `aria-hidden="true"` on decorative icon elements and rely on text or `aria-label` for the semantic meaning.
