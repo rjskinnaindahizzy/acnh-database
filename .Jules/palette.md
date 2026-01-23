@@ -17,3 +17,7 @@
 ## 2026-01-21 - [Semantic Hygiene for Icons]
 **Learning:** Decorative icons in text content (like arrows in buttons) are announced by screen readers (e.g., "Left Arrow Previous"), adding noise.
 **Action:** Use `aria-hidden="true"` on decorative icon elements and rely on text or `aria-label` for the semantic meaning.
+
+## 2026-01-22 - [State Persistence]
+**Learning:** Users appreciate when the application remembers their context (like selected sheet) after a reload. It reduces friction and makes the app feel smarter.
+**Action:** Use `localStorage` to persist transient user state (filters, selections) where appropriate, always validating the restored value against current available options.
