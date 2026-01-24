@@ -282,10 +282,12 @@ function setupEventListeners() {
         await clearSheetCache(currentSheet);
         cancelPrefetch('manual refresh');
 
+        let success = false;
         try {
             await loadSheetData(currentSheet, { forceRefresh: true });
             updateFilterVisibility();
             await applyFilters();
+            success = true;
         } catch (error) {
             console.error(`Error refreshing sheet ${currentSheet}:`, error);
             showEmptyState('error', {
@@ -293,8 +295,26 @@ function setupEventListeners() {
                 message: error.message || 'Please try again.'
             });
         } finally {
-            refreshBtn.disabled = false;
-            refreshBtn.innerHTML = originalBtnContent;
+            if (success) {
+                // Show success state briefly
+                refreshBtn.innerHTML = '<span role="img" aria-label="Success">✓</span> Refreshed!';
+                refreshBtn.style.background = 'var(--success)';
+                refreshBtn.style.color = 'white';
+                refreshBtn.style.borderColor = 'var(--success)';
+
+                // Revert to original state after delay
+                setTimeout(() => {
+                    refreshBtn.innerHTML = originalBtnContent;
+                    refreshBtn.style.background = '';
+                    refreshBtn.style.color = '';
+                    refreshBtn.style.borderColor = '';
+                    refreshBtn.disabled = false;
+                }, 2000);
+            } else {
+                // Error case: revert immediately
+                refreshBtn.innerHTML = originalBtnContent;
+                refreshBtn.disabled = false;
+            }
         }
     });
 
