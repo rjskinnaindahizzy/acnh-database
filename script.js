@@ -189,6 +189,13 @@ function setupEventListeners() {
     // Auto-load on sheet selection
     sheetSelect.addEventListener('change', async () => {
         currentSheet = sheetSelect.value;
+        // UX: Save selection to restore on reload
+        if (currentSheet) {
+            localStorage.setItem('acnh_last_sheet', currentSheet);
+        } else {
+            localStorage.removeItem('acnh_last_sheet');
+        }
+
         const hasSearch = searchInput.value.trim().length > 0;
 
         cancelPrefetch('sheet change');
@@ -530,8 +537,17 @@ async function loadAvailableSheets() {
 
         // Enable the selector and prompt user to choose a sheet
         sheetSelect.disabled = false;
-        updateEmptyStateMessage(`Found ${availableSheets.length} sheets. Select one to load.`);
-        showEmptyState('noSheet');
+
+        // UX: Restore last used sheet if available
+        const lastSheet = localStorage.getItem('acnh_last_sheet');
+        if (lastSheet && availableSheets.includes(lastSheet)) {
+            sheetSelect.value = lastSheet;
+            // Manually trigger change event to load data
+            sheetSelect.dispatchEvent(new Event('change'));
+        } else {
+            updateEmptyStateMessage(`Found ${availableSheets.length} sheets. Select one to load.`);
+            showEmptyState('noSheet');
+        }
 
     } catch (error) {
         console.error('Error loading sheets:', error);
