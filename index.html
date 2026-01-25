@@ -7,14 +7,14 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <a href="#results-anchor" class="skip-link">Skip to results</a>
     <div class="container">
         <header>
             <h1 tabindex="-1">Animal Crossing: New Horizons Item Database</h1>
             <p class="subtitle">Search and explore all ACNH items, villagers, and more</p>
         </header>
 
-        <main id="main-content" tabindex="-1">
+        <main>
             <div class="search-section">
                 <div class="api-key-section" id="apiKeySection">
                     <label for="apiKeyInput" class="api-key-label">Google Sheets API Key:</label>
@@ -72,13 +72,16 @@
                 </div>
             </div>
 
-            <div class="loading" id="loading" style="display: none;">
+            <div class="loading" id="loading" style="display: none;" tabindex="-1">
                 <div class="spinner"></div>
                 <p>Loading data...</p>
             </div>
 
+            <!-- Scroll anchor for skip link -->
+            <div id="results-anchor" tabindex="-1" style="outline: none;"></div>
+
             <!-- Empty State -->
-            <div class="empty-state" id="emptyState" style="display: none;">
+            <div class="empty-state" id="emptyState" style="display: none;" tabindex="-1">
                 <div class="empty-state-content">
                     <div class="empty-state-icon" id="emptyStateIcon">
                         <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -105,7 +108,7 @@
                 </div>
             </div>
 
-            <div class="results-section" id="resultsSection" style="display: none;">
+            <div class="results-section" id="resultsSection" style="display: none;" tabindex="-1">
                 <div class="table-container">
                     <table id="dataTable">
                         <thead id="tableHead">

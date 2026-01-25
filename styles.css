@@ -1023,7 +1023,16 @@ mark {
     box-shadow: 0 5px 15px rgba(0,0,0,0.2);
 }
 
-/* Remove outline from main content when focused via skip link */
-#main-content:focus {
-    outline: none;
+/* Visible focus indicator for skip link target */
+#results-anchor:focus {
+    outline: none; /* No outline for the empty anchor */
+}
+
+/* Ensure focus visibility on content containers if they receive focus */
+.results-section:focus,
+.empty-state:focus,
+.loading:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 10px;
 }
