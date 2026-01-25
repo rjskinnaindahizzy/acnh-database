@@ -1001,3 +1001,29 @@ mark {
         height: 45px;
     }
 }
+
+/* Skip to Content Link */
+.skip-link {
+    position: absolute;
+    top: -100px;
+    left: 20px;
+    background: var(--primary-strong);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 0 0 10px 10px;
+    text-decoration: none;
+    font-weight: 600;
+    z-index: 9999;
+    transition: top 0.3s ease;
+}
+
+.skip-link:focus {
+    top: 0;
+    outline: none;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+/* Remove outline from main content when focused via skip link */
+#main-content:focus {
+    outline: none;
+}

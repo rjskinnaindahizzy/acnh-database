@@ -17,3 +17,7 @@
 ## 2026-01-21 - [Semantic Hygiene for Icons]
 **Learning:** Decorative icons in text content (like arrows in buttons) are announced by screen readers (e.g., "Left Arrow Previous"), adding noise.
 **Action:** Use `aria-hidden="true"` on decorative icon elements and rely on text or `aria-label` for the semantic meaning.
+
+## 2026-01-22 - [Skip Navigation for Data Apps]
+**Learning:** In Single Page Apps with persistent top-level configuration (like API keys and search), keyboard users are forced to tab through utility fields on every page load just to reach the content.
+**Action:** Implement a "Skip to Content" link that targets the main data container, especially when the header contains form inputs.
