@@ -189,6 +189,13 @@ function setupEventListeners() {
     // Auto-load on sheet selection
     sheetSelect.addEventListener('change', async () => {
         currentSheet = sheetSelect.value;
+        // UX: Save selection to restore on reload
+        if (currentSheet) {
+            localStorage.setItem('acnh_last_sheet', currentSheet);
+        } else {
+            localStorage.removeItem('acnh_last_sheet');
+        }
+
         const hasSearch = searchInput.value.trim().length > 0;
 
         cancelPrefetch('sheet change');
@@ -282,10 +289,12 @@ function setupEventListeners() {
         await clearSheetCache(currentSheet);
         cancelPrefetch('manual refresh');
 
+        let success = false;
         try {
             await loadSheetData(currentSheet, { forceRefresh: true });
             updateFilterVisibility();
             await applyFilters();
+            success = true;
         } catch (error) {
             console.error(`Error refreshing sheet ${currentSheet}:`, error);
             showEmptyState('error', {
@@ -293,8 +302,26 @@ function setupEventListeners() {
                 message: error.message || 'Please try again.'
             });
         } finally {
-            refreshBtn.disabled = false;
-            refreshBtn.innerHTML = originalBtnContent;
+            if (success) {
+                // Show success state briefly
+                refreshBtn.innerHTML = '<span role="img" aria-label="Success">✓</span> Refreshed!';
+                refreshBtn.style.background = 'var(--success)';
+                refreshBtn.style.color = 'white';
+                refreshBtn.style.borderColor = 'var(--success)';
+
+                // Revert to original state after delay
+                setTimeout(() => {
+                    refreshBtn.innerHTML = originalBtnContent;
+                    refreshBtn.style.background = '';
+                    refreshBtn.style.color = '';
+                    refreshBtn.style.borderColor = '';
+                    refreshBtn.disabled = false;
+                }, 2000);
+            } else {
+                // Error case: revert immediately
+                refreshBtn.innerHTML = originalBtnContent;
+                refreshBtn.disabled = false;
+            }
         }
     });
 
@@ -530,8 +557,17 @@ async function loadAvailableSheets() {
 
         // Enable the selector and prompt user to choose a sheet
         sheetSelect.disabled = false;
-        updateEmptyStateMessage(`Found ${availableSheets.length} sheets. Select one to load.`);
-        showEmptyState('noSheet');
+
+        // UX: Restore last used sheet if available
+        const lastSheet = localStorage.getItem('acnh_last_sheet');
+        if (lastSheet && availableSheets.includes(lastSheet)) {
+            sheetSelect.value = lastSheet;
+            // Manually trigger change event to load data
+            sheetSelect.dispatchEvent(new Event('change'));
+        } else {
+            updateEmptyStateMessage(`Found ${availableSheets.length} sheets. Select one to load.`);
+            showEmptyState('noSheet');
+        }
 
     } catch (error) {
         console.error('Error loading sheets:', error);
