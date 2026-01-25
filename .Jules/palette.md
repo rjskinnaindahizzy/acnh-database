@@ -21,3 +21,6 @@
 ## 2026-01-22 - [Async Button Feedback States]
 **Learning:** Async actions (like Refresh) need a dedicated "Success" state to confirm completion, but placing this logic in a `finally` block causes false positives on error.
 **Action:** Use a success flag to conditionalize the "Success" animation in the `finally` block, ensuring users only see green checks when the action actually succeeds.
+## 2026-01-22 - [State Persistence]
+**Learning:** Users appreciate when the application remembers their context (like selected sheet) after a reload. It reduces friction and makes the app feel smarter.
+**Action:** Use `localStorage` to persist transient user state (filters, selections) where appropriate, always validating the restored value against current available options.
