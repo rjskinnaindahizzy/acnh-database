@@ -27,6 +27,28 @@ body {
     padding: 20px;
 }
 
+/* Skip Link for Accessibility */
+.skip-link {
+    position: absolute;
+    top: -100px;
+    left: 20px;
+    background: var(--primary-strong);
+    color: white;
+    padding: 12px 20px;
+    z-index: 2000;
+    border-radius: 0 0 8px 8px;
+    text-decoration: none;
+    font-weight: 700;
+    transition: top 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.skip-link:focus {
+    top: 0;
+    outline: 2px solid white;
+    outline-offset: -4px;
+}
+
 .container {
     max-width: 1400px;
     margin: 0 auto;
@@ -376,6 +398,12 @@ button {
     outline: none;
     background: white;
     cursor: pointer;
+}
+
+#sheetSelect:focus-visible {
+    border-color: var(--primary);
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
 }
 
 .stats {
