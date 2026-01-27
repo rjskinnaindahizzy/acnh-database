@@ -1001,3 +1001,30 @@ mark {
         height: 45px;
     }
 }
+
+/* Skip Link */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--primary);
+    color: white;
+    padding: 8px 16px;
+    z-index: 2000;
+    transition: top 0.2s;
+    font-weight: bold;
+    text-decoration: none;
+    border-bottom-right-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.skip-link:focus {
+    top: 0;
+    outline: 2px solid white;
+    outline-offset: -2px;
+}
+
+#main-content-area:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}

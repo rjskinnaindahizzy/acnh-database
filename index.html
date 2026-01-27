@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <a href="#main-content-area" class="skip-link">Skip to results</a>
     <div class="container">
         <header>
             <h1 tabindex="-1">Animal Crossing: New Horizons Item Database</h1>
@@ -70,50 +71,52 @@
             </div>
         </div>
 
-        <div class="loading" id="loading" style="display: none;">
-            <div class="spinner"></div>
-            <p>Loading data...</p>
-        </div>
+        <main id="main-content-area" tabindex="-1">
+            <div class="loading" id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Loading data...</p>
+            </div>
 
-        <!-- Empty State -->
-        <div class="empty-state" id="emptyState" style="display: none;">
-            <div class="empty-state-content">
-                <div class="empty-state-icon" id="emptyStateIcon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                    </svg>
-                </div>
-                <h2 id="emptyStateTitle">Welcome to ACNH Database!</h2>
-                <p id="emptyStateMessage">Select a sheet from the dropdown above to explore items, villagers, and more.</p>
-                <div class="empty-state-hints">
-                    <div class="hint-item">
-                        <span class="hint-icon" aria-hidden="true">🔍</span>
-                        <span>Use the search bar to find items across all sheets</span>
+            <!-- Empty State -->
+            <div class="empty-state" id="emptyState" style="display: none;">
+                <div class="empty-state-content">
+                    <div class="empty-state-icon" id="emptyStateIcon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                        </svg>
                     </div>
-                    <div class="hint-item">
-                        <span class="hint-icon" aria-hidden="true">📋</span>
-                        <span>Click the Columns button to customize your view</span>
-                    </div>
-                    <div class="hint-item">
-                        <span class="hint-icon" aria-hidden="true">📥</span>
-                        <span>Export your filtered results to CSV</span>
+                    <h2 id="emptyStateTitle">Welcome to ACNH Database!</h2>
+                    <p id="emptyStateMessage">Select a sheet from the dropdown above to explore items, villagers, and more.</p>
+                    <div class="empty-state-hints">
+                        <div class="hint-item">
+                            <span class="hint-icon" aria-hidden="true">🔍</span>
+                            <span>Use the search bar to find items across all sheets</span>
+                        </div>
+                        <div class="hint-item">
+                            <span class="hint-icon" aria-hidden="true">📋</span>
+                            <span>Click the Columns button to customize your view</span>
+                        </div>
+                        <div class="hint-item">
+                            <span class="hint-icon" aria-hidden="true">📥</span>
+                            <span>Export your filtered results to CSV</span>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="results-section" id="resultsSection" style="display: none;">
-            <div class="table-container">
-                <table id="dataTable">
-                    <thead id="tableHead">
-                        <tr></tr>
-                    </thead>
-                    <tbody id="tableBody">
-                    </tbody>
-                </table>
+            <div class="results-section" id="resultsSection" style="display: none;">
+                <div class="table-container">
+                    <table id="dataTable">
+                        <thead id="tableHead">
+                            <tr></tr>
+                        </thead>
+                        <tbody id="tableBody">
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
+        </main>
 
         <footer>
             <p>Data source: <a href="https://docs.google.com/spreadsheets/d/13d_LAJPlxMa_DubPTuirkIV4DERBMXbrWQsmSh8ReK4/edit" target="_blank">ACNH Spreadsheet</a></p>

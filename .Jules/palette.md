@@ -24,3 +24,7 @@
 ## 2026-01-22 - [State Persistence]
 **Learning:** Users appreciate when the application remembers their context (like selected sheet) after a reload. It reduces friction and makes the app feel smarter.
 **Action:** Use `localStorage` to persist transient user state (filters, selections) where appropriate, always validating the restored value against current available options.
+
+## 2026-01-27 - [Skip Link Implementation]
+**Learning:** Adding a "Skip to Content" link requires ensuring the target container is programmatically focusable using `tabindex="-1"`. Without this, the browser scrolls but focus remains on the link, forcing the user to tab through everything again.
+**Action:** Always wrap main content in a `<main id="main-content" tabindex="-1">` container when implementing skip links.
