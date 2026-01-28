@@ -27,6 +27,29 @@ body {
     padding: 20px;
 }
 
+/* Skip to content link */
+.skip-link {
+    position: absolute;
+    top: -100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary-strong);
+    color: white;
+    padding: 12px 25px;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 0 0 10px 10px;
+    z-index: 9999;
+    transition: top 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.skip-link:focus {
+    top: 0;
+    outline: 2px solid white;
+    outline-offset: -4px;
+}
+
 .container {
     max-width: 1400px;
     margin: 0 auto;
