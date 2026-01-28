@@ -182,6 +182,7 @@ header h1:focus-visible {
 /* Specific styling for API key input */
 #apiKeyInput {
     padding: 10px;
+    padding-right: 40px; /* Space for toggle button */
     border: 1px solid var(--border);
     border-radius: 5px;
     min-width: 300px;
@@ -233,6 +234,7 @@ header h1:focus-visible {
 #searchInput {
     width: 100%;
     padding: 15px;
+    padding-right: 40px; /* Space for clear button */
     font-size: 1.1rem;
     border: 2px solid var(--border);
     border-radius: 10px;
