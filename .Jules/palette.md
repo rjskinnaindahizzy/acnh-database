@@ -28,3 +28,7 @@
 ## 2026-01-27 - [Skip Link Implementation]
 **Learning:** Adding a "Skip to Content" link requires ensuring the target container is programmatically focusable using `tabindex="-1"`. Without this, the browser scrolls but focus remains on the link, forcing the user to tab through everything again.
 **Action:** Always wrap main content in a `<main id="main-content" tabindex="-1">` container when implementing skip links.
+
+## 2026-02-05 - [Pagination Scroll Behavior]
+**Learning:** When paginating through long lists, maintaining the scroll position forces users to manually scroll up to see new content, creating friction.
+**Action:** Automatically scroll the results container to the top (`scrollIntoView({ block: 'start' })`) when navigating between pages to streamline the reading flow.
