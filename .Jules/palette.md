@@ -28,3 +28,7 @@
 ## 2026-01-27 - [Skip Link Implementation]
 **Learning:** Adding a "Skip to Content" link requires ensuring the target container is programmatically focusable using `tabindex="-1"`. Without this, the browser scrolls but focus remains on the link, forcing the user to tab through everything again.
 **Action:** Always wrap main content in a `<main id="main-content" tabindex="-1">` container when implementing skip links.
+
+## 2026-02-12 - [Table Header Semantics]
+**Learning:** Assigning `role="button"` to sortable `<th>` elements overrides the native `columnheader` role, confusing screen reader users about the table structure.
+**Action:** Preserve native semantics for interactive headers; rely on `tabindex="0"` and `aria-sort` to communicate sortability and state, rather than overriding the role.

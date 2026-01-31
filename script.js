@@ -914,7 +914,6 @@ function displayData(data, isMultiSheet = false) {
         th.title = `Click to sort by ${header}`;
         th.className = 'sortable';
         th.tabIndex = 0;
-        th.setAttribute('role', 'button');
 
         // Add sort indicators
         if (sortColumn === header) {
