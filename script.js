@@ -1536,6 +1536,7 @@ function addClearSearchButton() {
         catalogFilter.value = '';
         updateClearButton();
         applyFilters();
+        searchInput.focus();
     });
 
     // Append to empty state content
