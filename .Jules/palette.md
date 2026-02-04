@@ -28,3 +28,7 @@
 ## 2026-01-27 - [Skip Link Implementation]
 **Learning:** Adding a "Skip to Content" link requires ensuring the target container is programmatically focusable using `tabindex="-1"`. Without this, the browser scrolls but focus remains on the link, forcing the user to tab through everything again.
 **Action:** Always wrap main content in a `<main id="main-content" tabindex="-1">` container when implementing skip links.
+
+## 2026-02-04 - [Focus Restoration on Recovery Actions]
+**Learning:** When a user triggers a "recovery" action (like "Clear Search") that removes the button they clicked, focus is lost to the body, disrupting their workflow.
+**Action:** Always programmatically move focus to a logical next element (e.g., the search input) after an action destroys the trigger element.
