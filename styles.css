@@ -237,6 +237,25 @@ button {
     background: var(--primary-strong);
 }
 
+#wrapTextBtn {
+    background: var(--soft);
+    color: #4a5568;
+    border: 2px solid var(--accent);
+    padding: 12px 18px;
+}
+
+#wrapTextBtn:hover {
+    background: var(--accent-soft);
+    color: #2d3748;
+    transform: translateY(-1px);
+}
+
+#wrapTextBtn[aria-pressed="true"] {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
 #refreshBtn {
     background: var(--soft);
     color: #4a5568;
@@ -714,6 +733,13 @@ td {
 td.expanded {
     white-space: normal;
     word-wrap: break-word;
+}
+
+/* Wrap text mode */
+.wrap-text td {
+    white-space: normal;
+    word-wrap: break-word;
+    overflow: visible;
 }
 
 td:hover {
