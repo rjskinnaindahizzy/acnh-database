@@ -255,6 +255,26 @@ button {
     cursor: not-allowed;
 }
 
+#wrapTextBtn {
+    background: var(--soft);
+    color: #4a5568;
+    border: 2px solid var(--accent);
+    padding: 12px 18px;
+}
+
+#wrapTextBtn:hover {
+    background: var(--accent-soft);
+    color: #2d3748;
+    transform: translateY(-1px);
+}
+
+#wrapTextBtn[aria-pressed="true"] {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
 /* Column toggle panel */
 .column-toggle-panel {
     background: white;
@@ -714,6 +734,13 @@ td {
 td.expanded {
     white-space: normal;
     word-wrap: break-word;
+}
+
+/* Global text wrap toggle */
+table.wrap-text td {
+    white-space: normal;
+    overflow: visible;
+    word-break: break-word;
 }
 
 td:hover {

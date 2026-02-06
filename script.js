@@ -61,6 +61,7 @@ const catalogFilter = document.getElementById('catalogFilter');
 const columnToggleBtn = document.getElementById('columnToggleBtn');
 const columnTogglePanel = document.getElementById('columnTogglePanel');
 const closeColumnToggle = document.getElementById('closeColumnToggle');
+const wrapTextBtn = document.getElementById('wrapTextBtn');
 const refreshBtn = document.getElementById('refreshBtn');
 const columnCheckboxes = document.getElementById('columnCheckboxes');
 const loading = document.getElementById('loading');
@@ -87,6 +88,9 @@ async function init() {
     // Hide filters, columns button, and stats initially
     hideFiltersAndControls();
 
+    // Initialize user preferences
+    initializeWrapText();
+
     // Show loading state while we fetch sheets
     showEmptyState('loading');
     sheetSelect.disabled = true;
@@ -109,6 +113,7 @@ function hideFiltersAndControls() {
     diyFilter.style.display = 'none';
     catalogFilter.style.display = 'none';
     columnToggleBtn.style.display = 'none';
+    if (wrapTextBtn) wrapTextBtn.style.display = 'none';
     refreshBtn.style.display = 'none';
     recordCount.style.display = 'none';
 }
@@ -116,6 +121,7 @@ function hideFiltersAndControls() {
 // Show filters and controls
 function showFiltersAndControls() {
     columnToggleBtn.style.display = 'block';
+    if (wrapTextBtn) wrapTextBtn.style.display = 'block';
     refreshBtn.style.display = 'block';
     recordCount.style.display = 'block';
     // DIY and Catalog filters shown based on sheet content via updateFilterVisibility()
@@ -228,6 +234,11 @@ function setupEventListeners() {
     // Filter changes
     diyFilter.addEventListener('change', applyFilters);
     catalogFilter.addEventListener('change', applyFilters);
+
+    // Wrap Text Toggle
+    if (wrapTextBtn) {
+        wrapTextBtn.addEventListener('click', toggleWrapText);
+    }
 
     // Column toggle
     columnToggleBtn.addEventListener('click', (e) => {
@@ -1746,6 +1757,34 @@ document.addEventListener('DOMContentLoaded', () => {
     settingsPara.appendChild(settingsLink);
     footer.appendChild(settingsPara);
 });
+
+// Toggle wrap text functionality
+function toggleWrapText() {
+    const table = document.getElementById('dataTable');
+    if (!table) return;
+
+    const isWrapped = table.classList.toggle('wrap-text');
+    if (wrapTextBtn) {
+        wrapTextBtn.setAttribute('aria-pressed', isWrapped);
+    }
+
+    // Persist preference
+    localStorage.setItem('acnh_wrap_text', isWrapped);
+}
+
+// Initialize wrap text state from storage
+function initializeWrapText() {
+    const shouldWrap = localStorage.getItem('acnh_wrap_text') === 'true';
+    const table = document.getElementById('dataTable');
+
+    if (shouldWrap && table) {
+        table.classList.add('wrap-text');
+        if (wrapTextBtn) {
+            wrapTextBtn.setAttribute('aria-pressed', 'true');
+        }
+    }
+}
+
 // Show/hide clear button based on search input
 function updateClearButton() {
     if (!searchClearBtn) return;
