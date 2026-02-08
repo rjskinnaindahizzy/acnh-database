@@ -28,3 +28,7 @@
 ## 2026-01-27 - [Skip Link Implementation]
 **Learning:** Adding a "Skip to Content" link requires ensuring the target container is programmatically focusable using `tabindex="-1"`. Without this, the browser scrolls but focus remains on the link, forcing the user to tab through everything again.
 **Action:** Always wrap main content in a `<main id="main-content" tabindex="-1">` container when implementing skip links.
+
+## 2026-01-29 - [Table Content Accessibility]
+**Learning:** Truncating table cells with `text-overflow: ellipsis` improves scannability but hides content from users without interactions (like mouse hover or focus).
+**Action:** Provide a global toggle (e.g., "Wrap Text") that switches the display mode for all cells, persisting the preference in `localStorage`.
