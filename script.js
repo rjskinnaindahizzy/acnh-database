@@ -58,6 +58,7 @@ const searchClearBtn = document.getElementById('searchClearBtn');
 const sheetSelect = document.getElementById('sheetSelect');
 const diyFilter = document.getElementById('diyFilter');
 const catalogFilter = document.getElementById('catalogFilter');
+const wrapTextBtn = document.getElementById('wrapTextBtn');
 const columnToggleBtn = document.getElementById('columnToggleBtn');
 const columnTogglePanel = document.getElementById('columnTogglePanel');
 const closeColumnToggle = document.getElementById('closeColumnToggle');
@@ -84,6 +85,14 @@ async function init() {
     loadApiKeyFromStorage();
     setupEventListeners();
 
+    // Restore text wrap preference
+    const wrapTextPref = localStorage.getItem('acnh_wrap_text') === 'true';
+    if (wrapTextPref && wrapTextBtn) {
+        wrapTextBtn.setAttribute('aria-pressed', 'true');
+        const table = document.getElementById('dataTable');
+        if (table) table.classList.add('wrap-text');
+    }
+
     // Hide filters, columns button, and stats initially
     hideFiltersAndControls();
 
@@ -109,6 +118,7 @@ function hideFiltersAndControls() {
     diyFilter.style.display = 'none';
     catalogFilter.style.display = 'none';
     columnToggleBtn.style.display = 'none';
+    if (wrapTextBtn) wrapTextBtn.style.display = 'none';
     refreshBtn.style.display = 'none';
     recordCount.style.display = 'none';
 }
@@ -116,6 +126,7 @@ function hideFiltersAndControls() {
 // Show filters and controls
 function showFiltersAndControls() {
     columnToggleBtn.style.display = 'block';
+    if (wrapTextBtn) wrapTextBtn.style.display = 'block';
     refreshBtn.style.display = 'block';
     recordCount.style.display = 'block';
     // DIY and Catalog filters shown based on sheet content via updateFilterVisibility()
@@ -250,6 +261,25 @@ function setupEventListeners() {
         // Return focus to the button that opened it
         columnToggleBtn.focus();
     });
+
+    // Toggle text wrapping
+    if (wrapTextBtn) {
+        wrapTextBtn.addEventListener('click', () => {
+            const isPressed = wrapTextBtn.getAttribute('aria-pressed') === 'true';
+            const newState = !isPressed;
+            wrapTextBtn.setAttribute('aria-pressed', String(newState));
+
+            const table = document.getElementById('dataTable');
+            if (table) {
+                if (newState) {
+                    table.classList.add('wrap-text');
+                } else {
+                    table.classList.remove('wrap-text');
+                }
+            }
+            localStorage.setItem('acnh_wrap_text', String(newState));
+        });
+    }
 
     // Close column toggle on Escape key
     document.addEventListener('keydown', (e) => {
