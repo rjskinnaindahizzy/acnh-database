@@ -655,6 +655,50 @@ function highlightText(text, query) {
     }).join('');
 }
 
+// Remove duplicate rows from results.
+// When crossSheet is true, deduplicates across sheets using Name-based key.
+// Otherwise removes exact duplicate rows (all column values identical).
+function deduplicateRows(rows, crossSheet = false) {
+    if (rows.length <= 1) return rows;
+
+    const seen = new Set();
+    const result = [];
+
+    for (const row of rows) {
+        let key;
+
+        if (crossSheet && row['Name']) {
+            // Cross-sheet: use Name + distinguishing columns so different
+            // variants of the same item are preserved as separate entries.
+            const parts = [row['Name']];
+            if (row['Variant'] !== undefined) parts.push(row['Variant']);
+            if (row['Variation'] !== undefined) parts.push(row['Variation']);
+            if (row['Color 1'] !== undefined) parts.push(row['Color 1']);
+            if (row['Pattern'] !== undefined) parts.push(row['Pattern']);
+            key = parts.join('|').toLowerCase().trim();
+        } else {
+            // Same-sheet or no Name column: build key from all data columns.
+            key = Object.entries(row)
+                .filter(([k]) => k !== '_sheet')
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([, v]) => String(v))
+                .join('|');
+        }
+
+        if (!key) {
+            result.push(row);
+            continue;
+        }
+
+        if (!seen.has(key)) {
+            seen.add(key);
+            result.push(row);
+        }
+    }
+
+    return result;
+}
+
 // Load data for a single sheet (lazy-loaded)
 async function loadSheetData(sheetName, { forceRefresh = false, showLoading = true } = {}) {
     if (!sheetName) return null;
@@ -1266,6 +1310,9 @@ async function applyFilters() {
                 combinedData = combinedData.concat(filteredRows);
             }
 
+            // Remove duplicate entries across sheets
+            combinedData = deduplicateRows(combinedData, isGlobalSearch);
+
             // If a specific sheet is selected, filter results to only that sheet
             if (currentSheet) {
                 combinedData = combinedData.filter(row => row._sheet === currentSheet);
@@ -1299,7 +1346,7 @@ async function applyFilters() {
                 return true;
             });
 
-            combinedData = filteredRows;
+            combinedData = deduplicateRows(filteredRows, false);
             isMultiSheet = false;
         }
 
