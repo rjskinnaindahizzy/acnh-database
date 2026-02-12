@@ -673,6 +673,14 @@ function groupRowsByName(rows) {
     return order.map(name => ({ name, rows: groups.get(name) }));
 }
 
+// Check if a column holds image data (by header name or by its values).
+function isImageColumn(col, rows) {
+    if (isImageHeader(col)) return true;
+    // Sample first row's value to detect image URLs / formulas
+    const sample = (rows[0] && rows[0][col]) || '';
+    return isImageFormulaValue(sample) || isLikelyImageUrl(sample);
+}
+
 // Build a variant label for each row in a group by finding which columns
 // actually differ between variants (e.g. "Yellow", "Green" for Color 1).
 function getVariantLabels(groupRows, hdrs) {
@@ -686,6 +694,7 @@ function getVariantLabels(groupRows, hdrs) {
     const differingCols = [];
     for (const col of candidateCols) {
         if (!hdrs.includes(col)) continue;
+        if (isImageColumn(col, groupRows)) continue;
         const values = new Set(groupRows.map(r => (r[col] || '').trim()));
         if (values.size > 1) differingCols.push(col);
     }
@@ -693,7 +702,8 @@ function getVariantLabels(groupRows, hdrs) {
     // Fallback: if no known variant columns differ, scan all visible columns
     if (differingCols.length === 0) {
         for (const col of hdrs) {
-            if (col === 'Name' || col.toLowerCase().startsWith('image')) continue;
+            if (col === 'Name') continue;
+            if (isImageColumn(col, groupRows)) continue;
             const values = new Set(groupRows.map(r => (r[col] || '').trim()));
             if (values.size > 1) {
                 differingCols.push(col);
@@ -1071,30 +1081,35 @@ function displayData(data, isMultiSheet = false) {
                 const groupId = `grp-${currentPage}-${idx}`;
                 tr.classList.add('group-row');
 
-                // Add variant toggle button to the Name cell
+                // Add clickable variant count badge to the Name cell
                 const nameIdx = headers.indexOf('Name');
                 if (nameIdx >= 0 && tr.children[nameIdx]) {
                     const nameCell = tr.children[nameIdx];
                     const count = group.rows.length - 1;
 
-                    const toggle = document.createElement('button');
-                    toggle.className = 'variant-toggle';
-                    toggle.type = 'button';
-                    toggle.innerHTML = `&#9656; ${count} variant${count > 1 ? 's' : ''}`;
-                    toggle.setAttribute('aria-expanded', 'false');
-                    toggle.setAttribute('aria-label', `Show ${count} variant${count > 1 ? 's' : ''} of ${group.name}`);
-                    toggle.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        const expanded = toggle.getAttribute('aria-expanded') === 'true';
-                        toggle.setAttribute('aria-expanded', String(!expanded));
-                        toggle.innerHTML = (expanded ? '&#9656;' : '&#9662;') + ` ${count} variant${count > 1 ? 's' : ''}`;
-                        tr.classList.toggle('group-expanded', !expanded);
+                    const badge = document.createElement('span');
+                    badge.className = 'variant-badge';
+                    badge.textContent = `${count} variant${count > 1 ? 's' : ''}`;
+                    badge.setAttribute('role', 'button');
+                    badge.setAttribute('tabindex', '0');
+                    badge.setAttribute('aria-expanded', 'false');
+                    badge.setAttribute('aria-label', `Show ${count} variant${count > 1 ? 's' : ''} of ${group.name}`);
 
+                    const toggleVariants = (e) => {
+                        e.stopPropagation();
+                        const expanded = badge.getAttribute('aria-expanded') === 'true';
+                        badge.setAttribute('aria-expanded', String(!expanded));
+                        tr.classList.toggle('group-expanded', !expanded);
                         const variantRows = tableBody.querySelectorAll(`.variant-row[data-group-id="${groupId}"]`);
                         variantRows.forEach(vr => { vr.style.display = expanded ? 'none' : ''; });
+                    };
+
+                    badge.addEventListener('click', toggleVariants);
+                    badge.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleVariants(e); }
                     });
 
-                    nameCell.appendChild(toggle);
+                    nameCell.appendChild(badge);
                 }
 
                 tableBody.appendChild(tr);
