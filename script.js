@@ -655,48 +655,59 @@ function highlightText(text, query) {
     }).join('');
 }
 
-// Remove duplicate rows from results.
-// When crossSheet is true, deduplicates across sheets using Name-based key.
-// Otherwise removes exact duplicate rows (all column values identical).
-function deduplicateRows(rows, crossSheet = false) {
-    if (rows.length <= 1) return rows;
-
-    const seen = new Set();
-    const result = [];
+// Group rows by Name for collapsible variant display.
+// Returns an array of { name, rows } objects preserving original order.
+function groupRowsByName(rows) {
+    const groups = new Map();
+    const order = [];
 
     for (const row of rows) {
-        let key;
-
-        if (crossSheet && row['Name']) {
-            // Cross-sheet: use Name + distinguishing columns so different
-            // variants of the same item are preserved as separate entries.
-            const parts = [row['Name']];
-            if (row['Variant'] !== undefined) parts.push(row['Variant']);
-            if (row['Variation'] !== undefined) parts.push(row['Variation']);
-            if (row['Color 1'] !== undefined) parts.push(row['Color 1']);
-            if (row['Pattern'] !== undefined) parts.push(row['Pattern']);
-            key = parts.join('|').toLowerCase().trim();
-        } else {
-            // Same-sheet or no Name column: build key from all data columns.
-            key = Object.entries(row)
-                .filter(([k]) => k !== '_sheet')
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([, v]) => String(v))
-                .join('|');
+        const name = row['Name'] || '';
+        if (!groups.has(name)) {
+            groups.set(name, []);
+            order.push(name);
         }
-
-        if (!key) {
-            result.push(row);
-            continue;
-        }
-
-        if (!seen.has(key)) {
-            seen.add(key);
-            result.push(row);
-        }
+        groups.get(name).push(row);
     }
 
-    return result;
+    return order.map(name => ({ name, rows: groups.get(name) }));
+}
+
+// Create a single table row element from row data.
+function createDataRow(row, hdrs, searchQuery) {
+    const tr = document.createElement('tr');
+
+    hdrs.forEach(header => {
+        const td = document.createElement('td');
+        const value = (header === 'Sheet') ? (row._sheet || '') : (row[header] || '');
+
+        const shouldRenderImage = isImageHeader(header) || isImageFormulaValue(value) || isLikelyImageUrl(value);
+        const resolvedUrl = shouldRenderImage ? resolveImageUrl(value) : '';
+
+        if (shouldRenderImage && resolvedUrl) {
+            const img = document.createElement('img');
+            img.src = resolvedUrl;
+            img.alt = row['Name'] || 'Image';
+            img.className = 'item-image';
+            img.loading = 'lazy';
+            td.appendChild(img);
+            td.className = 'image-cell';
+        } else {
+            if (searchQuery) {
+                td.innerHTML = highlightText(value, searchQuery);
+            } else {
+                td.textContent = value;
+            }
+            td.title = 'Click to expand';
+            td.addEventListener('click', function() {
+                this.classList.toggle('expanded');
+            });
+        }
+
+        tr.appendChild(td);
+    });
+
+    return tr;
 }
 
 // Load data for a single sheet (lazy-loaded)
@@ -994,23 +1005,82 @@ function displayData(data, isMultiSheet = false) {
         shouldFocusSort = false;
     }
 
-    // Calculate pagination
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-    const paginatedData = data.slice(startIndex, endIndex);
-
-    // Create table rows with optional grouping by sheet
+    // Create table rows
     tableBody.innerHTML = '';
 
     // Get current search query for highlighting
     const searchQuery = searchInput.value.trim();
 
-    if (isMultiSheet) {
-        // Group by sheet for visual separation
+    // Determine whether to use grouped display (collapse same-Name variants)
+    const hasNameColumn = headers.includes('Name');
+    const useGrouping = !isMultiSheet && hasNameColumn;
+
+    if (useGrouping) {
+        // Group rows by Name, paginate by group, and render with expand/collapse
+        const groups = groupRowsByName(data);
+        const totalGroups = groups.length;
+        const startGroup = (currentPage - 1) * rowsPerPage;
+        const endGroup = startGroup + rowsPerPage;
+        const paginatedGroups = groups.slice(startGroup, endGroup);
+
+        paginatedGroups.forEach((group, idx) => {
+            const primaryRow = group.rows[0];
+            const tr = createDataRow(primaryRow, headers, searchQuery);
+
+            if (group.rows.length > 1) {
+                const groupId = `grp-${currentPage}-${idx}`;
+                tr.classList.add('group-row');
+
+                // Add variant toggle button to the Name cell
+                const nameIdx = headers.indexOf('Name');
+                if (nameIdx >= 0 && tr.children[nameIdx]) {
+                    const nameCell = tr.children[nameIdx];
+                    const count = group.rows.length - 1;
+
+                    const toggle = document.createElement('button');
+                    toggle.className = 'variant-toggle';
+                    toggle.type = 'button';
+                    toggle.innerHTML = `&#9656; ${count} variant${count > 1 ? 's' : ''}`;
+                    toggle.setAttribute('aria-expanded', 'false');
+                    toggle.setAttribute('aria-label', `Show ${count} variant${count > 1 ? 's' : ''} of ${group.name}`);
+                    toggle.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const expanded = toggle.getAttribute('aria-expanded') === 'true';
+                        toggle.setAttribute('aria-expanded', String(!expanded));
+                        toggle.innerHTML = (expanded ? '&#9656;' : '&#9662;') + ` ${count} variant${count > 1 ? 's' : ''}`;
+                        tr.classList.toggle('group-expanded', !expanded);
+
+                        const variantRows = tableBody.querySelectorAll(`.variant-row[data-group-id="${groupId}"]`);
+                        variantRows.forEach(vr => { vr.style.display = expanded ? 'none' : ''; });
+                    });
+
+                    nameCell.appendChild(toggle);
+                }
+
+                tableBody.appendChild(tr);
+
+                // Create hidden variant rows
+                for (let i = 1; i < group.rows.length; i++) {
+                    const variantTr = createDataRow(group.rows[i], headers, searchQuery);
+                    variantTr.classList.add('variant-row');
+                    variantTr.dataset.groupId = groupId;
+                    variantTr.style.display = 'none';
+                    tableBody.appendChild(variantTr);
+                }
+            } else {
+                tableBody.appendChild(tr);
+            }
+        });
+
+        renderPagination(totalGroups);
+
+    } else if (isMultiSheet) {
+        // Multi-sheet: flat rows with sheet separators
+        const startIndex = (currentPage - 1) * rowsPerPage;
+        const paginatedData = data.slice(startIndex, startIndex + rowsPerPage);
         let currentSheetName = null;
 
         paginatedData.forEach(row => {
-            // Add sheet separator row if sheet changed
             if (row._sheet !== currentSheetName) {
                 currentSheetName = row._sheet;
                 const separatorRow = document.createElement('tr');
@@ -1022,90 +1092,22 @@ function displayData(data, isMultiSheet = false) {
                 tableBody.appendChild(separatorRow);
             }
 
-            const tr = document.createElement('tr');
-            headers.forEach(header => {
-                const td = document.createElement('td');
-                let value;
-
-                // Handle special "Sheet" column
-                if (header === 'Sheet') {
-                    value = row._sheet || '';
-                } else {
-                    value = row[header] || '';
-                }
-
-                // Special handling for Image column
-                const shouldRenderImage = isImageHeader(header) || isImageFormulaValue(value) || isLikelyImageUrl(value);
-                const resolvedImageUrl = shouldRenderImage ? resolveImageUrl(value) : '';
-                if (shouldRenderImage && resolvedImageUrl) {
-                    const img = document.createElement('img');
-                    img.src = resolvedImageUrl;
-                    img.alt = row['Name'] || 'Image';
-                    img.className = 'item-image';
-                    img.loading = 'lazy';
-                    td.appendChild(img);
-                    td.className = 'image-cell';
-                } else {
-                    // Highlight search terms if present
-                    if (searchQuery) {
-                        td.innerHTML = highlightText(value, searchQuery);
-                    } else {
-                        td.textContent = value;
-                    }
-                    td.title = 'Click to expand';
-
-                    // Click to expand/collapse
-                    td.addEventListener('click', function() {
-                        this.classList.toggle('expanded');
-                    });
-                }
-
-                tr.appendChild(td);
-            });
-            tableBody.appendChild(tr);
+            tableBody.appendChild(createDataRow(row, headers, searchQuery));
         });
+
+        renderPagination(data.length);
+
     } else {
-        // Normal single-sheet display
+        // Flat single-sheet display (no Name column)
+        const startIndex = (currentPage - 1) * rowsPerPage;
+        const paginatedData = data.slice(startIndex, startIndex + rowsPerPage);
+
         paginatedData.forEach(row => {
-            const tr = document.createElement('tr');
-            headers.forEach(header => {
-                const td = document.createElement('td');
-                const value = row[header] || '';
-
-                // Special handling for Image column
-                const shouldRenderImage = isImageHeader(header) || isImageFormulaValue(value) || isLikelyImageUrl(value);
-                const resolvedImageUrl = shouldRenderImage ? resolveImageUrl(value) : '';
-                if (shouldRenderImage && resolvedImageUrl) {
-                    const img = document.createElement('img');
-                    img.src = resolvedImageUrl;
-                    img.alt = row['Name'] || 'Image';
-                    img.className = 'item-image';
-                    img.loading = 'lazy';
-                    td.appendChild(img);
-                    td.className = 'image-cell';
-                } else {
-                    // Highlight search terms if present
-                    if (searchQuery) {
-                        td.innerHTML = highlightText(value, searchQuery);
-                    } else {
-                        td.textContent = value;
-                    }
-                    td.title = 'Click to expand';
-
-                    // Click to expand/collapse
-                    td.addEventListener('click', function() {
-                        this.classList.toggle('expanded');
-                    });
-                }
-
-                tr.appendChild(td);
-            });
-            tableBody.appendChild(tr);
+            tableBody.appendChild(createDataRow(row, headers, searchQuery));
         });
-    }
 
-    // Add pagination controls
-    renderPagination(data.length);
+        renderPagination(data.length);
+    }
 
     resultsSection.style.display = 'block';
 }
@@ -1310,9 +1312,6 @@ async function applyFilters() {
                 combinedData = combinedData.concat(filteredRows);
             }
 
-            // Remove duplicate entries across sheets
-            combinedData = deduplicateRows(combinedData, isGlobalSearch);
-
             // If a specific sheet is selected, filter results to only that sheet
             if (currentSheet) {
                 combinedData = combinedData.filter(row => row._sheet === currentSheet);
@@ -1346,7 +1345,7 @@ async function applyFilters() {
                 return true;
             });
 
-            combinedData = deduplicateRows(filteredRows, false);
+            combinedData = filteredRows;
             isMultiSheet = false;
         }
 
@@ -1428,10 +1427,27 @@ function updateRecordCount() {
 
     if (allData.length === 0) {
         recordCount.textContent = 'No results found';
-    } else if (currentData.length === allData.length) {
-        recordCount.textContent = `Showing all ${allData.length} records`;
     } else {
-        recordCount.textContent = `Showing ${currentData.length} of ${allData.length} records`;
+        // Show unique item count when grouping is active
+        const hasNameColumn = headers.includes('Name');
+        const total = currentData.length;
+
+        if (hasNameColumn && currentSheet) {
+            const uniqueNames = new Set(currentData.map(r => r['Name'])).size;
+            if (uniqueNames < total) {
+                recordCount.textContent = currentData.length === allData.length
+                    ? `Showing ${uniqueNames} items (${total} total with variants)`
+                    : `Showing ${uniqueNames} items (${total} total) of ${allData.length} records`;
+            } else {
+                recordCount.textContent = currentData.length === allData.length
+                    ? `Showing all ${total} records`
+                    : `Showing ${total} of ${allData.length} records`;
+            }
+        } else if (currentData.length === allData.length) {
+            recordCount.textContent = `Showing all ${total} records`;
+        } else {
+            recordCount.textContent = `Showing ${total} of ${allData.length} records`;
+        }
     }
 }
 
