@@ -59,6 +59,7 @@ const sheetSelect = document.getElementById('sheetSelect');
 const diyFilter = document.getElementById('diyFilter');
 const catalogFilter = document.getElementById('catalogFilter');
 const columnToggleBtn = document.getElementById('columnToggleBtn');
+const wrapTextBtn = document.getElementById('wrapTextBtn');
 const columnTogglePanel = document.getElementById('columnTogglePanel');
 const closeColumnToggle = document.getElementById('closeColumnToggle');
 const refreshBtn = document.getElementById('refreshBtn');
@@ -228,6 +229,26 @@ function setupEventListeners() {
     // Filter changes
     diyFilter.addEventListener('change', applyFilters);
     catalogFilter.addEventListener('change', applyFilters);
+
+    // Wrap Text toggle
+    if (wrapTextBtn) {
+        // Initialize state
+        const isWrapped = localStorage.getItem('acnh_wrap_text') === 'true';
+        const dataTable = document.getElementById('dataTable');
+
+        if (isWrapped) {
+            dataTable.classList.add('wrap-text');
+            wrapTextBtn.classList.add('active');
+            wrapTextBtn.setAttribute('aria-pressed', 'true');
+        }
+
+        wrapTextBtn.addEventListener('click', () => {
+            const isNowWrapped = dataTable.classList.toggle('wrap-text');
+            wrapTextBtn.classList.toggle('active', isNowWrapped);
+            wrapTextBtn.setAttribute('aria-pressed', isNowWrapped);
+            localStorage.setItem('acnh_wrap_text', isNowWrapped);
+        });
+    }
 
     // Column toggle
     columnToggleBtn.addEventListener('click', (e) => {

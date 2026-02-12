@@ -28,3 +28,7 @@
 ## 2026-01-27 - [Skip Link Implementation]
 **Learning:** Adding a "Skip to Content" link requires ensuring the target container is programmatically focusable using `tabindex="-1"`. Without this, the browser scrolls but focus remains on the link, forcing the user to tab through everything again.
 **Action:** Always wrap main content in a `<main id="main-content" tabindex="-1">` container when implementing skip links.
+
+## 2026-02-03 - [Table Readability Toggle]
+**Learning:** Truncated cells save space but frustrate users when content is long. A global "Wrap Text" toggle is more accessible than per-cell expansion because it allows keyboard users to reveal content without navigating to every cell.
+**Action:** Provide global view options (like "Wrap Text") for data tables to accommodate different reading needs and ensure content is accessible to keyboard users.
