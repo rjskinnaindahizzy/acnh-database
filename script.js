@@ -677,7 +677,7 @@ function groupRowsByName(rows) {
 function isImageColumn(col, rows) {
     if (isImageHeader(col)) return true;
     // Sample first row's value to detect image URLs / formulas
-    const sample = (rows[0] && rows[0][col]) || '';
+    const sample = String((rows[0] && rows[0][col]) ?? '');
     return isImageFormulaValue(sample) || isLikelyImageUrl(sample);
 }
 
@@ -695,7 +695,7 @@ function getVariantLabels(groupRows, hdrs) {
     for (const col of candidateCols) {
         if (!hdrs.includes(col)) continue;
         if (isImageColumn(col, groupRows)) continue;
-        const values = new Set(groupRows.map(r => (r[col] || '').trim()));
+        const values = new Set(groupRows.map(r => String(r[col] ?? '').trim()));
         if (values.size > 1) differingCols.push(col);
     }
 
@@ -704,7 +704,7 @@ function getVariantLabels(groupRows, hdrs) {
         for (const col of hdrs) {
             if (col === 'Name') continue;
             if (isImageColumn(col, groupRows)) continue;
-            const values = new Set(groupRows.map(r => (r[col] || '').trim()));
+            const values = new Set(groupRows.map(r => String(r[col] ?? '').trim()));
             if (values.size > 1) {
                 differingCols.push(col);
                 break;
@@ -715,7 +715,7 @@ function getVariantLabels(groupRows, hdrs) {
     return groupRows.map((row, i) => {
         if (differingCols.length === 0) return `Variant ${i + 1}`;
         const parts = differingCols
-            .map(col => (row[col] || '').trim())
+            .map(col => String(row[col] ?? '').trim())
             .filter(Boolean);
         // Remove duplicate values (e.g. Variation="Yellow" and Color 1="Yellow")
         const unique = [...new Set(parts)];
