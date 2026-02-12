@@ -667,6 +667,12 @@ tbody tr:nth-child(even):hover {
     background: #ece6ff !important;
 }
 
+.variant-label {
+    color: var(--accent-strong);
+    font-weight: 600;
+    font-style: italic;
+}
+
 footer {
     background: #fdfaf1;
     padding: 30px 40px;

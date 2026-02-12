@@ -673,6 +673,46 @@ function groupRowsByName(rows) {
     return order.map(name => ({ name, rows: groups.get(name) }));
 }
 
+// Build a variant label for each row in a group by finding which columns
+// actually differ between variants (e.g. "Yellow", "Green" for Color 1).
+function getVariantLabels(groupRows, hdrs) {
+    // Columns that commonly distinguish variants, checked in priority order
+    const candidateCols = [
+        'Variation', 'Variant', 'Color 1', 'Color 2',
+        'Pattern', 'Body Color', 'Filename'
+    ];
+
+    // Find which candidate columns actually vary across these rows
+    const differingCols = [];
+    for (const col of candidateCols) {
+        if (!hdrs.includes(col)) continue;
+        const values = new Set(groupRows.map(r => (r[col] || '').trim()));
+        if (values.size > 1) differingCols.push(col);
+    }
+
+    // Fallback: if no known variant columns differ, scan all visible columns
+    if (differingCols.length === 0) {
+        for (const col of hdrs) {
+            if (col === 'Name' || col.toLowerCase().startsWith('image')) continue;
+            const values = new Set(groupRows.map(r => (r[col] || '').trim()));
+            if (values.size > 1) {
+                differingCols.push(col);
+                break;
+            }
+        }
+    }
+
+    return groupRows.map((row, i) => {
+        if (differingCols.length === 0) return `Variant ${i + 1}`;
+        const parts = differingCols
+            .map(col => (row[col] || '').trim())
+            .filter(Boolean);
+        // Remove duplicate values (e.g. Variation="Yellow" and Color 1="Yellow")
+        const unique = [...new Set(parts)];
+        return unique.length > 0 ? unique.join(' / ') : `Variant ${i + 1}`;
+    });
+}
+
 // Create a single table row element from row data.
 function createDataRow(row, hdrs, searchQuery) {
     const tr = document.createElement('tr');
@@ -1059,12 +1099,24 @@ function displayData(data, isMultiSheet = false) {
 
                 tableBody.appendChild(tr);
 
-                // Create hidden variant rows
+                // Create hidden variant rows with distinguishing labels
+                const labels = getVariantLabels(group.rows, headers);
                 for (let i = 1; i < group.rows.length; i++) {
                     const variantTr = createDataRow(group.rows[i], headers, searchQuery);
                     variantTr.classList.add('variant-row');
                     variantTr.dataset.groupId = groupId;
                     variantTr.style.display = 'none';
+
+                    // Replace Name cell with variant-specific label
+                    if (nameIdx >= 0 && variantTr.children[nameIdx] && labels[i]) {
+                        const varNameCell = variantTr.children[nameIdx];
+                        varNameCell.textContent = '';
+                        const labelSpan = document.createElement('span');
+                        labelSpan.className = 'variant-label';
+                        labelSpan.textContent = labels[i];
+                        varNameCell.appendChild(labelSpan);
+                    }
+
                     tableBody.appendChild(variantTr);
                 }
             } else {
