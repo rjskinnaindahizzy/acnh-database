@@ -1394,11 +1394,14 @@ async function applyFilters() {
                 combinedData = combinedData.filter(row => row._sheet === currentSheet);
             }
 
-            // Deduplicate cross-sheet results that represent the same item
+            // Deduplicate results within the same sheet. Include _sheet in the
+            // key so distinct items from different categories that happen to
+            // share the same name/variant metadata are preserved.
             if (isGlobalSearch) {
                 const seen = new Set();
                 combinedData = combinedData.filter(row => {
                     const key = [
+                        row['_sheet'] || '',
                         row['Name'] || '',
                         row['Variant'] || '',
                         row['Variation'] || '',
