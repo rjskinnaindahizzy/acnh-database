@@ -26,6 +26,7 @@ let prefetchInFlight = 0;
 let prefetchRunning = false;
 let shouldFocusSort = false; // Flag to restore focus to sort header
 let shouldFocusPagination = null; // Flag to restore focus to pagination buttons
+let isCurrentMultiSheet = false; // Track whether current display is multi-sheet
 const PREFETCH_CONCURRENCY = 2;
 const MOST_USED_SHEETS = [
     'Housewares',
@@ -655,6 +656,115 @@ function highlightText(text, query) {
     }).join('');
 }
 
+// Group rows by Name for collapsible variant display.
+// Returns an array of { name, rows } objects preserving original order.
+function groupRowsByName(rows) {
+    const groups = new Map();
+    const order = [];
+    let blankId = 0;
+
+    for (const row of rows) {
+        const name = row['Name'] || '';
+        // Treat each blank-name row as its own group to avoid
+        // collapsing unrelated rows that happen to lack a Name.
+        const key = name === '' ? `\x00blank_${blankId++}` : name;
+        if (!groups.has(key)) {
+            groups.set(key, []);
+            order.push(key);
+        }
+        groups.get(key).push(row);
+    }
+
+    return order.map(key => ({ name: groups.get(key)[0]['Name'] || '', rows: groups.get(key) }));
+}
+
+// Check if a column holds image data (by header name or by its values).
+function isImageColumn(col, rows) {
+    if (isImageHeader(col)) return true;
+    // Sample first row's value to detect image URLs / formulas
+    const sample = String((rows[0] && rows[0][col]) ?? '');
+    return isImageFormulaValue(sample) || isLikelyImageUrl(sample);
+}
+
+// Build a variant label for each row in a group by finding which columns
+// actually differ between variants (e.g. "Yellow", "Green" for Color 1).
+function getVariantLabels(groupRows, hdrs) {
+    // Columns that commonly distinguish variants, checked in priority order
+    const candidateCols = [
+        'Variation', 'Variant', 'Color 1', 'Color 2',
+        'Pattern', 'Body Color', 'Filename'
+    ];
+
+    // Find which candidate columns actually vary across these rows
+    const differingCols = [];
+    for (const col of candidateCols) {
+        if (!hdrs.includes(col)) continue;
+        if (isImageColumn(col, groupRows)) continue;
+        const values = new Set(groupRows.map(r => String(r[col] ?? '').trim()));
+        if (values.size > 1) differingCols.push(col);
+    }
+
+    // Fallback: if no known variant columns differ, scan all visible columns
+    if (differingCols.length === 0) {
+        for (const col of hdrs) {
+            if (col === 'Name') continue;
+            if (isImageColumn(col, groupRows)) continue;
+            const values = new Set(groupRows.map(r => String(r[col] ?? '').trim()));
+            if (values.size > 1) {
+                differingCols.push(col);
+                break;
+            }
+        }
+    }
+
+    return groupRows.map((row, i) => {
+        if (differingCols.length === 0) return `Variant ${i + 1}`;
+        const parts = differingCols
+            .map(col => String(row[col] ?? '').trim())
+            .filter(Boolean);
+        // Remove duplicate values (e.g. Variation="Yellow" and Color 1="Yellow")
+        const unique = [...new Set(parts)];
+        return unique.length > 0 ? unique.join(' / ') : `Variant ${i + 1}`;
+    });
+}
+
+// Create a single table row element from row data.
+function createDataRow(row, hdrs, searchQuery) {
+    const tr = document.createElement('tr');
+
+    hdrs.forEach(header => {
+        const td = document.createElement('td');
+        const value = (header === 'Sheet') ? (row._sheet || '') : (row[header] || '');
+
+        const shouldRenderImage = isImageHeader(header) || isImageFormulaValue(value) || isLikelyImageUrl(value);
+        const resolvedUrl = shouldRenderImage ? resolveImageUrl(value) : '';
+
+        if (shouldRenderImage && resolvedUrl) {
+            const img = document.createElement('img');
+            img.src = resolvedUrl;
+            img.alt = row['Name'] || 'Image';
+            img.className = 'item-image';
+            img.loading = 'lazy';
+            td.appendChild(img);
+            td.className = 'image-cell';
+        } else {
+            if (searchQuery) {
+                td.innerHTML = highlightText(value, searchQuery);
+            } else {
+                td.textContent = value;
+            }
+            td.title = 'Click to expand';
+            td.addEventListener('click', function() {
+                this.classList.toggle('expanded');
+            });
+        }
+
+        tr.appendChild(td);
+    });
+
+    return tr;
+}
+
 // Load data for a single sheet (lazy-loaded)
 async function loadSheetData(sheetName, { forceRefresh = false, showLoading = true } = {}) {
     if (!sheetName) return null;
@@ -846,7 +956,7 @@ function toggleColumn(columnName, isVisible) {
     }
 
     headers = visibleColumns;
-    displayData(currentData);
+    displayData(currentData, isCurrentMultiSheet);
 }
 
 // Update filter visibility based on selected sheet
@@ -868,7 +978,12 @@ function updateFilterVisibility() {
 }
 
 // Display data in table with pagination
-function displayData(data, isMultiSheet = false) {
+function displayData(data, isMultiSheet) {
+    if (isMultiSheet !== undefined) {
+        isCurrentMultiSheet = isMultiSheet;
+    }
+    isMultiSheet = isCurrentMultiSheet;
+
     if (data.length === 0 || headers.length === 0) {
         resultsSection.style.display = 'none';
 
@@ -950,23 +1065,99 @@ function displayData(data, isMultiSheet = false) {
         shouldFocusSort = false;
     }
 
-    // Calculate pagination
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-    const paginatedData = data.slice(startIndex, endIndex);
-
-    // Create table rows with optional grouping by sheet
+    // Create table rows
     tableBody.innerHTML = '';
 
     // Get current search query for highlighting
     const searchQuery = searchInput.value.trim();
 
-    if (isMultiSheet) {
-        // Group by sheet for visual separation
+    // Determine whether to use grouped display (collapse same-Name variants)
+    const hasNameColumn = headers.includes('Name');
+    const useGrouping = !isMultiSheet && hasNameColumn;
+
+    if (useGrouping) {
+        // Group rows by Name, paginate by group, and render with expand/collapse
+        const groups = groupRowsByName(data);
+        const totalGroups = groups.length;
+        const startGroup = (currentPage - 1) * rowsPerPage;
+        const endGroup = startGroup + rowsPerPage;
+        const paginatedGroups = groups.slice(startGroup, endGroup);
+
+        paginatedGroups.forEach((group, idx) => {
+            const primaryRow = group.rows[0];
+            const tr = createDataRow(primaryRow, headers, searchQuery);
+
+            if (group.rows.length > 1) {
+                const groupId = `grp-${currentPage}-${idx}`;
+                tr.classList.add('group-row');
+
+                // Add clickable variant count badge to the Name cell
+                const nameIdx = headers.indexOf('Name');
+                if (nameIdx >= 0 && tr.children[nameIdx]) {
+                    const nameCell = tr.children[nameIdx];
+                    const count = group.rows.length - 1;
+
+                    const badge = document.createElement('span');
+                    badge.className = 'variant-badge';
+                    badge.textContent = `${count} variant${count > 1 ? 's' : ''}`;
+                    badge.setAttribute('role', 'button');
+                    badge.setAttribute('tabindex', '0');
+                    badge.setAttribute('aria-expanded', 'false');
+                    badge.setAttribute('aria-label', `Show ${count} variant${count > 1 ? 's' : ''} of ${group.name}`);
+
+                    const toggleVariants = (e) => {
+                        e.stopPropagation();
+                        const expanded = badge.getAttribute('aria-expanded') === 'true';
+                        badge.setAttribute('aria-expanded', String(!expanded));
+                        tr.classList.toggle('group-expanded', !expanded);
+                        const variantRows = tableBody.querySelectorAll(`.variant-row[data-group-id="${groupId}"]`);
+                        variantRows.forEach(vr => { vr.style.display = expanded ? 'none' : ''; });
+                    };
+
+                    badge.addEventListener('click', toggleVariants);
+                    badge.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleVariants(e); }
+                    });
+
+                    nameCell.appendChild(badge);
+                }
+
+                tableBody.appendChild(tr);
+
+                // Create hidden variant rows with distinguishing labels
+                const labels = getVariantLabels(group.rows, headers);
+                for (let i = 1; i < group.rows.length; i++) {
+                    const variantTr = createDataRow(group.rows[i], headers, searchQuery);
+                    variantTr.classList.add('variant-row');
+                    variantTr.dataset.groupId = groupId;
+                    variantTr.style.display = 'none';
+
+                    // Replace Name cell with variant-specific label
+                    if (nameIdx >= 0 && variantTr.children[nameIdx] && labels[i]) {
+                        const varNameCell = variantTr.children[nameIdx];
+                        varNameCell.textContent = '';
+                        const labelSpan = document.createElement('span');
+                        labelSpan.className = 'variant-label';
+                        labelSpan.textContent = labels[i];
+                        varNameCell.appendChild(labelSpan);
+                    }
+
+                    tableBody.appendChild(variantTr);
+                }
+            } else {
+                tableBody.appendChild(tr);
+            }
+        });
+
+        renderPagination(totalGroups);
+
+    } else if (isMultiSheet) {
+        // Multi-sheet: flat rows with sheet separators
+        const startIndex = (currentPage - 1) * rowsPerPage;
+        const paginatedData = data.slice(startIndex, startIndex + rowsPerPage);
         let currentSheetName = null;
 
         paginatedData.forEach(row => {
-            // Add sheet separator row if sheet changed
             if (row._sheet !== currentSheetName) {
                 currentSheetName = row._sheet;
                 const separatorRow = document.createElement('tr');
@@ -978,90 +1169,22 @@ function displayData(data, isMultiSheet = false) {
                 tableBody.appendChild(separatorRow);
             }
 
-            const tr = document.createElement('tr');
-            headers.forEach(header => {
-                const td = document.createElement('td');
-                let value;
-
-                // Handle special "Sheet" column
-                if (header === 'Sheet') {
-                    value = row._sheet || '';
-                } else {
-                    value = row[header] || '';
-                }
-
-                // Special handling for Image column
-                const shouldRenderImage = isImageHeader(header) || isImageFormulaValue(value) || isLikelyImageUrl(value);
-                const resolvedImageUrl = shouldRenderImage ? resolveImageUrl(value) : '';
-                if (shouldRenderImage && resolvedImageUrl) {
-                    const img = document.createElement('img');
-                    img.src = resolvedImageUrl;
-                    img.alt = row['Name'] || 'Image';
-                    img.className = 'item-image';
-                    img.loading = 'lazy';
-                    td.appendChild(img);
-                    td.className = 'image-cell';
-                } else {
-                    // Highlight search terms if present
-                    if (searchQuery) {
-                        td.innerHTML = highlightText(value, searchQuery);
-                    } else {
-                        td.textContent = value;
-                    }
-                    td.title = 'Click to expand';
-
-                    // Click to expand/collapse
-                    td.addEventListener('click', function() {
-                        this.classList.toggle('expanded');
-                    });
-                }
-
-                tr.appendChild(td);
-            });
-            tableBody.appendChild(tr);
+            tableBody.appendChild(createDataRow(row, headers, searchQuery));
         });
+
+        renderPagination(data.length);
+
     } else {
-        // Normal single-sheet display
+        // Flat single-sheet display (no Name column)
+        const startIndex = (currentPage - 1) * rowsPerPage;
+        const paginatedData = data.slice(startIndex, startIndex + rowsPerPage);
+
         paginatedData.forEach(row => {
-            const tr = document.createElement('tr');
-            headers.forEach(header => {
-                const td = document.createElement('td');
-                const value = row[header] || '';
-
-                // Special handling for Image column
-                const shouldRenderImage = isImageHeader(header) || isImageFormulaValue(value) || isLikelyImageUrl(value);
-                const resolvedImageUrl = shouldRenderImage ? resolveImageUrl(value) : '';
-                if (shouldRenderImage && resolvedImageUrl) {
-                    const img = document.createElement('img');
-                    img.src = resolvedImageUrl;
-                    img.alt = row['Name'] || 'Image';
-                    img.className = 'item-image';
-                    img.loading = 'lazy';
-                    td.appendChild(img);
-                    td.className = 'image-cell';
-                } else {
-                    // Highlight search terms if present
-                    if (searchQuery) {
-                        td.innerHTML = highlightText(value, searchQuery);
-                    } else {
-                        td.textContent = value;
-                    }
-                    td.title = 'Click to expand';
-
-                    // Click to expand/collapse
-                    td.addEventListener('click', function() {
-                        this.classList.toggle('expanded');
-                    });
-                }
-
-                tr.appendChild(td);
-            });
-            tableBody.appendChild(tr);
+            tableBody.appendChild(createDataRow(row, headers, searchQuery));
         });
-    }
 
-    // Add pagination controls
-    renderPagination(data.length);
+        renderPagination(data.length);
+    }
 
     resultsSection.style.display = 'block';
 }
@@ -1271,6 +1394,27 @@ async function applyFilters() {
                 combinedData = combinedData.filter(row => row._sheet === currentSheet);
             }
 
+            // Deduplicate results within the same sheet. Include _sheet in the
+            // key so distinct items from different categories that happen to
+            // share the same name/variant metadata are preserved.
+            if (isGlobalSearch) {
+                const seen = new Set();
+                combinedData = combinedData.filter(row => {
+                    const key = [
+                        row['_sheet'] || '',
+                        row['Name'] || '',
+                        row['Variant'] || '',
+                        row['Variation'] || '',
+                        row['Color 1'] || '',
+                        row['Color 2'] || '',
+                        row['Pattern'] || ''
+                    ].join('\x00');
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                });
+            }
+
             // Check if results come from multiple sheets
             const uniqueSheets = new Set(combinedData.map(row => row._sheet));
             isMultiSheet = uniqueSheets.size > 1;
@@ -1381,10 +1525,27 @@ function updateRecordCount() {
 
     if (allData.length === 0) {
         recordCount.textContent = 'No results found';
-    } else if (currentData.length === allData.length) {
-        recordCount.textContent = `Showing all ${allData.length} records`;
     } else {
-        recordCount.textContent = `Showing ${currentData.length} of ${allData.length} records`;
+        // Show unique item count when grouping is active
+        const hasNameColumn = headers.includes('Name');
+        const total = currentData.length;
+
+        if (hasNameColumn && currentSheet) {
+            const uniqueNames = new Set(currentData.map(r => r['Name'])).size;
+            if (uniqueNames < total) {
+                recordCount.textContent = currentData.length === allData.length
+                    ? `Showing ${uniqueNames} items (${total} total with variants)`
+                    : `Showing ${uniqueNames} items (${total} total) of ${allData.length} records`;
+            } else {
+                recordCount.textContent = currentData.length === allData.length
+                    ? `Showing all ${total} records`
+                    : `Showing ${total} of ${allData.length} records`;
+            }
+        } else if (currentData.length === allData.length) {
+            recordCount.textContent = `Showing all ${total} records`;
+        } else {
+            recordCount.textContent = `Showing ${total} of ${allData.length} records`;
+        }
     }
 }
 
