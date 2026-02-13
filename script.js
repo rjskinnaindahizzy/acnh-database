@@ -58,6 +58,7 @@ const searchClearBtn = document.getElementById('searchClearBtn');
 const sheetSelect = document.getElementById('sheetSelect');
 const diyFilter = document.getElementById('diyFilter');
 const catalogFilter = document.getElementById('catalogFilter');
+const wrapTextBtn = document.getElementById('wrapTextBtn');
 const columnToggleBtn = document.getElementById('columnToggleBtn');
 const columnTogglePanel = document.getElementById('columnTogglePanel');
 const closeColumnToggle = document.getElementById('closeColumnToggle');
@@ -82,6 +83,7 @@ let dbPromise = null;
 // Initialize the application
 async function init() {
     loadApiKeyFromStorage();
+    loadWrapTextPreference();
     setupEventListeners();
 
     // Hide filters, columns button, and stats initially
@@ -108,6 +110,7 @@ async function init() {
 function hideFiltersAndControls() {
     diyFilter.style.display = 'none';
     catalogFilter.style.display = 'none';
+    if (wrapTextBtn) wrapTextBtn.style.display = 'none';
     columnToggleBtn.style.display = 'none';
     refreshBtn.style.display = 'none';
     recordCount.style.display = 'none';
@@ -115,6 +118,7 @@ function hideFiltersAndControls() {
 
 // Show filters and controls
 function showFiltersAndControls() {
+    if (wrapTextBtn) wrapTextBtn.style.display = 'block';
     columnToggleBtn.style.display = 'block';
     refreshBtn.style.display = 'block';
     recordCount.style.display = 'block';
@@ -228,6 +232,25 @@ function setupEventListeners() {
     // Filter changes
     diyFilter.addEventListener('change', applyFilters);
     catalogFilter.addEventListener('change', applyFilters);
+
+    // Wrap text toggle
+    if (wrapTextBtn) {
+        wrapTextBtn.addEventListener('click', () => {
+            const dataTable = document.getElementById('dataTable');
+            const isPressed = wrapTextBtn.getAttribute('aria-pressed') === 'true';
+            const newState = !isPressed;
+
+            wrapTextBtn.setAttribute('aria-pressed', newState);
+
+            if (newState) {
+                dataTable.classList.add('wrap-text');
+                localStorage.setItem('acnh_wrap_text', 'true');
+            } else {
+                dataTable.classList.remove('wrap-text');
+                localStorage.removeItem('acnh_wrap_text');
+            }
+        });
+    }
 
     // Column toggle
     columnToggleBtn.addEventListener('click', (e) => {
@@ -501,6 +524,20 @@ async function saveApiKey() {
     } finally {
         saveApiKeyBtn.disabled = false;
         saveApiKeyBtn.innerHTML = originalBtnContent;
+    }
+}
+
+// Load wrap text preference
+function loadWrapTextPreference() {
+    const saved = localStorage.getItem('acnh_wrap_text');
+    if (saved === 'true' && wrapTextBtn) {
+        wrapTextBtn.setAttribute('aria-pressed', 'true');
+        // We apply to table immediately, assuming table exists or will exist
+        // The table is always in DOM, just hidden/empty
+        const dataTable = document.getElementById('dataTable');
+        if (dataTable) {
+            dataTable.classList.add('wrap-text');
+        }
     }
 }
 

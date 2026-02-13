@@ -227,13 +227,15 @@ button {
     min-width: 150px;
 }
 
-#columnToggleBtn {
+#columnToggleBtn,
+#wrapTextBtn {
     background: var(--primary);
     color: white;
     padding: 12px 20px;
 }
 
-#columnToggleBtn:hover {
+#columnToggleBtn:hover,
+#wrapTextBtn:hover {
     background: var(--primary-strong);
 }
 
@@ -714,6 +716,13 @@ td {
 td.expanded {
     white-space: normal;
     word-wrap: break-word;
+}
+
+/* Global wrap text override */
+.wrap-text td {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow: visible !important;
 }
 
 td:hover {
