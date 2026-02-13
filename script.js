@@ -26,6 +26,7 @@ let prefetchInFlight = 0;
 let prefetchRunning = false;
 let shouldFocusSort = false; // Flag to restore focus to sort header
 let shouldFocusPagination = null; // Flag to restore focus to pagination buttons
+let isCurrentMultiSheet = false; // Track whether current display is multi-sheet
 const PREFETCH_CONCURRENCY = 2;
 const MOST_USED_SHEETS = [
     'Housewares',
@@ -660,17 +661,21 @@ function highlightText(text, query) {
 function groupRowsByName(rows) {
     const groups = new Map();
     const order = [];
+    let blankId = 0;
 
     for (const row of rows) {
         const name = row['Name'] || '';
-        if (!groups.has(name)) {
-            groups.set(name, []);
-            order.push(name);
+        // Treat each blank-name row as its own group to avoid
+        // collapsing unrelated rows that happen to lack a Name.
+        const key = name === '' ? `\x00blank_${blankId++}` : name;
+        if (!groups.has(key)) {
+            groups.set(key, []);
+            order.push(key);
         }
-        groups.get(name).push(row);
+        groups.get(key).push(row);
     }
 
-    return order.map(name => ({ name, rows: groups.get(name) }));
+    return order.map(key => ({ name: groups.get(key)[0]['Name'] || '', rows: groups.get(key) }));
 }
 
 // Check if a column holds image data (by header name or by its values).
@@ -951,7 +956,7 @@ function toggleColumn(columnName, isVisible) {
     }
 
     headers = visibleColumns;
-    displayData(currentData);
+    displayData(currentData, isCurrentMultiSheet);
 }
 
 // Update filter visibility based on selected sheet
@@ -973,7 +978,12 @@ function updateFilterVisibility() {
 }
 
 // Display data in table with pagination
-function displayData(data, isMultiSheet = false) {
+function displayData(data, isMultiSheet) {
+    if (isMultiSheet !== undefined) {
+        isCurrentMultiSheet = isMultiSheet;
+    }
+    isMultiSheet = isCurrentMultiSheet;
+
     if (data.length === 0 || headers.length === 0) {
         resultsSection.style.display = 'none';
 
@@ -1382,6 +1392,24 @@ async function applyFilters() {
             // If a specific sheet is selected, filter results to only that sheet
             if (currentSheet) {
                 combinedData = combinedData.filter(row => row._sheet === currentSheet);
+            }
+
+            // Deduplicate cross-sheet results that represent the same item
+            if (isGlobalSearch) {
+                const seen = new Set();
+                combinedData = combinedData.filter(row => {
+                    const key = [
+                        row['Name'] || '',
+                        row['Variant'] || '',
+                        row['Variation'] || '',
+                        row['Color 1'] || '',
+                        row['Color 2'] || '',
+                        row['Pattern'] || ''
+                    ].join('\x00');
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                });
             }
 
             // Check if results come from multiple sheets
