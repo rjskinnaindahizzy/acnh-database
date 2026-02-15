@@ -27,6 +27,7 @@ let prefetchRunning = false;
 let shouldFocusSort = false; // Flag to restore focus to sort header
 let shouldFocusPagination = null; // Flag to restore focus to pagination buttons
 let isCurrentMultiSheet = false; // Track whether current display is multi-sheet
+let isTextWrapped = false; // Track text wrap preference
 const PREFETCH_CONCURRENCY = 2;
 const MOST_USED_SHEETS = [
     'Housewares',
@@ -63,6 +64,7 @@ const columnToggleBtn = document.getElementById('columnToggleBtn');
 const columnTogglePanel = document.getElementById('columnTogglePanel');
 const closeColumnToggle = document.getElementById('closeColumnToggle');
 const refreshBtn = document.getElementById('refreshBtn');
+const wrapTextBtn = document.getElementById('wrapTextBtn');
 const columnCheckboxes = document.getElementById('columnCheckboxes');
 const loading = document.getElementById('loading');
 const emptyState = document.getElementById('emptyState');
@@ -88,6 +90,10 @@ async function init() {
     // Hide filters, columns button, and stats initially
     hideFiltersAndControls();
 
+    // Load user preference for text wrapping
+    isTextWrapped = localStorage.getItem('acnh_wrap_text') === 'true';
+    applyTextWrap();
+
     // Show loading state while we fetch sheets
     showEmptyState('loading');
     sheetSelect.disabled = true;
@@ -111,6 +117,7 @@ function hideFiltersAndControls() {
     catalogFilter.style.display = 'none';
     columnToggleBtn.style.display = 'none';
     refreshBtn.style.display = 'none';
+    if (wrapTextBtn) wrapTextBtn.style.display = 'none';
     recordCount.style.display = 'none';
 }
 
@@ -118,6 +125,7 @@ function hideFiltersAndControls() {
 function showFiltersAndControls() {
     columnToggleBtn.style.display = 'block';
     refreshBtn.style.display = 'block';
+    if (wrapTextBtn) wrapTextBtn.style.display = 'block';
     recordCount.style.display = 'block';
     // DIY and Catalog filters shown based on sheet content via updateFilterVisibility()
 }
@@ -229,6 +237,15 @@ function setupEventListeners() {
     // Filter changes
     diyFilter.addEventListener('change', applyFilters);
     catalogFilter.addEventListener('change', applyFilters);
+
+    // Wrap text toggle
+    if (wrapTextBtn) {
+        wrapTextBtn.addEventListener('click', () => {
+            isTextWrapped = !isTextWrapped;
+            localStorage.setItem('acnh_wrap_text', isTextWrapped);
+            applyTextWrap();
+        });
+    }
 
     // Column toggle
     columnToggleBtn.addEventListener('click', (e) => {
@@ -974,6 +991,22 @@ function updateFilterVisibility() {
         // Reset filter values when switching sheets
         diyFilter.value = '';
         catalogFilter.value = '';
+    }
+}
+
+// Toggle text wrapping on table
+function applyTextWrap() {
+    const table = document.getElementById('dataTable');
+    if (table) {
+        if (isTextWrapped) {
+            table.classList.add('wrap-text');
+        } else {
+            table.classList.remove('wrap-text');
+        }
+    }
+
+    if (wrapTextBtn) {
+        wrapTextBtn.setAttribute('aria-pressed', isTextWrapped);
     }
 }
 
