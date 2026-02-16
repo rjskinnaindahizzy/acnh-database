@@ -28,3 +28,6 @@
 ## 2026-01-27 - [Skip Link Implementation]
 **Learning:** Adding a "Skip to Content" link requires ensuring the target container is programmatically focusable using `tabindex="-1"`. Without this, the browser scrolls but focus remains on the link, forcing the user to tab through everything again.
 **Action:** Always wrap main content in a `<main id="main-content" tabindex="-1">` container when implementing skip links.
+## 2026-02-16 - [Wrap Text Toggle]
+**Learning:** Adding a global view toggle (like Wrap Text) provides a cleaner, more accessible way to handle dense data than per-cell interactions, which can clutter the keyboard tab order.
+**Action:** Prefer global view settings over repetitive per-item controls for data presentation preferences.
