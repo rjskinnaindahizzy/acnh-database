@@ -28,3 +28,7 @@
 ## 2026-01-27 - [Skip Link Implementation]
 **Learning:** Adding a "Skip to Content" link requires ensuring the target container is programmatically focusable using `tabindex="-1"`. Without this, the browser scrolls but focus remains on the link, forcing the user to tab through everything again.
 **Action:** Always wrap main content in a `<main id="main-content" tabindex="-1">` container when implementing skip links.
+
+## 2026-01-29 - [Data Density Control]
+**Learning:** Tables with long text fields often force users to choose between scannability (truncate) and readability (wrap). A global "Wrap Text" toggle empowers users to switch contexts on the fly without layout shifts.
+**Action:** Implement global view controls (like Wrap Text) that persist user preference, ensuring the interface adapts to their current reading mode.
