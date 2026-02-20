@@ -1087,3 +1087,38 @@ mark {
     outline: 2px solid var(--primary);
     outline-offset: 2px;
 }
+
+/* Wrap text toggle */
+#wrapTextBtn {
+    background: white;
+    color: var(--text-dark);
+    border: 2px solid #e0e0e0;
+    padding: 12px 18px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#wrapTextBtn span {
+    font-size: 1.2em;
+    line-height: 1;
+}
+
+#wrapTextBtn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+#wrapTextBtn[aria-pressed="true"] {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent-strong);
+}
+
+/* Wrap text functionality */
+.wrap-text td {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+}
