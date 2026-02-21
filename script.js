@@ -59,6 +59,7 @@ const searchClearBtn = document.getElementById('searchClearBtn');
 const sheetSelect = document.getElementById('sheetSelect');
 const diyFilter = document.getElementById('diyFilter');
 const catalogFilter = document.getElementById('catalogFilter');
+const wrapTextBtn = document.getElementById('wrapTextBtn');
 const columnToggleBtn = document.getElementById('columnToggleBtn');
 const columnTogglePanel = document.getElementById('columnTogglePanel');
 const closeColumnToggle = document.getElementById('closeColumnToggle');
@@ -88,6 +89,13 @@ async function init() {
     // Hide filters, columns button, and stats initially
     hideFiltersAndControls();
 
+    // Load wrap text preference
+    const wrapTextPref = localStorage.getItem('acnh_wrap_text') === 'true';
+    if (wrapTextPref) {
+        document.getElementById('dataTable').classList.add('wrap-text');
+        if (wrapTextBtn) wrapTextBtn.setAttribute('aria-pressed', 'true');
+    }
+
     // Show loading state while we fetch sheets
     showEmptyState('loading');
     sheetSelect.disabled = true;
@@ -109,6 +117,7 @@ async function init() {
 function hideFiltersAndControls() {
     diyFilter.style.display = 'none';
     catalogFilter.style.display = 'none';
+    wrapTextBtn.style.display = 'none';
     columnToggleBtn.style.display = 'none';
     refreshBtn.style.display = 'none';
     recordCount.style.display = 'none';
@@ -116,6 +125,7 @@ function hideFiltersAndControls() {
 
 // Show filters and controls
 function showFiltersAndControls() {
+    wrapTextBtn.style.display = 'block';
     columnToggleBtn.style.display = 'block';
     refreshBtn.style.display = 'block';
     recordCount.style.display = 'block';
@@ -229,6 +239,16 @@ function setupEventListeners() {
     // Filter changes
     diyFilter.addEventListener('change', applyFilters);
     catalogFilter.addEventListener('change', applyFilters);
+
+    // Wrap text toggle
+    if (wrapTextBtn) {
+        wrapTextBtn.addEventListener('click', () => {
+            const table = document.getElementById('dataTable');
+            const isWrapped = table.classList.toggle('wrap-text');
+            wrapTextBtn.setAttribute('aria-pressed', String(isWrapped));
+            localStorage.setItem('acnh_wrap_text', String(isWrapped));
+        });
+    }
 
     // Column toggle
     columnToggleBtn.addEventListener('click', (e) => {
