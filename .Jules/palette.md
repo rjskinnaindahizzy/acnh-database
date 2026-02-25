@@ -3,7 +3,7 @@
 **Action:** Always include a visibility toggle for password/API key fields, using accessible ARIA labels to indicate state changes.
 
 ## 2026-01-16 - [Pagination Focus Management]
-**Learning:** Re-rendering pagination controls destroys the focused element, sending keyboard focus back to `body`. This breaks the navigation flow for keyboard users.
+**Learning:** Re-rendering pagination controls destroys the focused element, sending keyboard focus back to 'body'. This breaks the navigation flow for keyboard users.
 **Action:** When re-rendering interactive controls like pagination, manually restore focus to the equivalent new element (or a logical fallback like 'Previous' if 'Next' becomes disabled).
 
 ## 2026-01-19 - [Button Feedback for Sync Actions]
@@ -28,3 +28,7 @@
 ## 2026-01-27 - [Skip Link Implementation]
 **Learning:** Adding a "Skip to Content" link requires ensuring the target container is programmatically focusable using `tabindex="-1"`. Without this, the browser scrolls but focus remains on the link, forcing the user to tab through everything again.
 **Action:** Always wrap main content in a `<main id="main-content" tabindex="-1">` container when implementing skip links.
+
+## 2026-02-25 - [Global View Preferences]
+**Learning:** While interaction-on-demand (click-to-expand) keeps UI clean, tasks requiring comparison or scanning long text benefit from global toggles rather than repetitive actions.
+**Action:** When truncating content for density, offer a global "Expand All" or "Wrap Text" toggle to support different reading modes efficiently.
