@@ -59,6 +59,7 @@ const searchClearBtn = document.getElementById('searchClearBtn');
 const sheetSelect = document.getElementById('sheetSelect');
 const diyFilter = document.getElementById('diyFilter');
 const catalogFilter = document.getElementById('catalogFilter');
+const wrapTextBtn = document.getElementById('wrapTextBtn');
 const columnToggleBtn = document.getElementById('columnToggleBtn');
 const columnTogglePanel = document.getElementById('columnTogglePanel');
 const closeColumnToggle = document.getElementById('closeColumnToggle');
@@ -109,6 +110,7 @@ async function init() {
 function hideFiltersAndControls() {
     diyFilter.style.display = 'none';
     catalogFilter.style.display = 'none';
+    wrapTextBtn.style.display = 'none';
     columnToggleBtn.style.display = 'none';
     refreshBtn.style.display = 'none';
     recordCount.style.display = 'none';
@@ -116,6 +118,7 @@ function hideFiltersAndControls() {
 
 // Show filters and controls
 function showFiltersAndControls() {
+    wrapTextBtn.style.display = 'block';
     columnToggleBtn.style.display = 'block';
     refreshBtn.style.display = 'block';
     recordCount.style.display = 'block';
@@ -125,6 +128,22 @@ function showFiltersAndControls() {
 // Setup event listeners
 function setupEventListeners() {
     saveApiKeyBtn.addEventListener('click', saveApiKey);
+
+    // Text Wrapping Toggle
+    if (wrapTextBtn) {
+        const savedWrapState = localStorage.getItem('acnh_wrap_text') === 'true';
+        if (savedWrapState) {
+            document.getElementById('dataTable').classList.add('wrap-text');
+            wrapTextBtn.setAttribute('aria-pressed', 'true');
+        }
+
+        wrapTextBtn.addEventListener('click', () => {
+            const table = document.getElementById('dataTable');
+            const isWrapped = table.classList.toggle('wrap-text');
+            wrapTextBtn.setAttribute('aria-pressed', String(isWrapped));
+            localStorage.setItem('acnh_wrap_text', isWrapped);
+        });
+    }
 
     // Toggle API Key visibility
     if (toggleApiKeyBtn) {
