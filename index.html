@@ -20,7 +20,7 @@
                 <div class="input-wrapper">
                     <input type="password" id="apiKeyInput" placeholder="Enter your API key here">
                     <button id="toggleApiKeyBtn" class="input-action-btn" type="button" aria-label="Show API key" title="Show API key">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                     </button>
                 </div>
                 <button id="saveApiKeyBtn">Save API Key</button>
@@ -40,7 +40,7 @@
                     <option value="">Loading sheets...</option>
                 </select>
 
-                <button id="refreshBtn" title="Reload current sheet" aria-label="Reload current sheet">↻ Refresh</button>
+                <button id="refreshBtn" title="Reload current sheet" aria-label="Reload current sheet"><span aria-hidden="true">↻</span> Refresh</button>
 
                 <select id="diyFilter" aria-label="Filter by DIY status">
                     <option value="">DIY: All</option>
@@ -55,7 +55,7 @@
                     <option value="Not in catalog">Not in catalog</option>
                 </select>
 
-                <button id="columnToggleBtn" aria-label="Toggle columns" aria-expanded="false" aria-controls="columnTogglePanel" aria-haspopup="dialog">📋 Columns</button>
+                <button id="columnToggleBtn" aria-label="Toggle columns" aria-expanded="false" aria-controls="columnTogglePanel" aria-haspopup="dialog"><span aria-hidden="true">📋</span> Columns</button>
             </div>
 
             <div class="stats">
@@ -65,7 +65,7 @@
             <div class="column-toggle-panel" id="columnTogglePanel" style="display: none;" role="dialog" aria-modal="false" aria-labelledby="columnToggleTitle">
                 <div class="column-toggle-header">
                     <h3 id="columnToggleTitle">Show/Hide Columns</h3>
-                    <button id="closeColumnToggle" aria-label="Close column settings">✕</button>
+                    <button id="closeColumnToggle" aria-label="Close column settings"><span aria-hidden="true">✕</span></button>
                 </div>
                 <div id="columnCheckboxes"></div>
             </div>
@@ -125,7 +125,7 @@
     </div>
 
     <button id="backToTopBtn" aria-label="Back to top" title="Back to top">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 15l-6-6-6 6"/>
         </svg>
     </button>
