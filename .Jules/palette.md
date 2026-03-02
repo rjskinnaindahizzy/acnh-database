@@ -28,3 +28,7 @@
 ## 2026-01-27 - [Skip Link Implementation]
 **Learning:** Adding a "Skip to Content" link requires ensuring the target container is programmatically focusable using `tabindex="-1"`. Without this, the browser scrolls but focus remains on the link, forcing the user to tab through everything again.
 **Action:** Always wrap main content in a `<main id="main-content" tabindex="-1">` container when implementing skip links.
+
+## 2024-03-02 - Hidden Decorators
+**Learning:** Screen readers announce random text and emojis like `↻` and `📋` in buttons if they are not explicitly hidden.
+**Action:** Added `<span aria-hidden="true">` wrappers to several decorators like `📋`, `↻`, `✕`, and `🔄` across the interface to prevent redundant announcements by assistive technologies.
