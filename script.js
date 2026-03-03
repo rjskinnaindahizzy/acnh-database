@@ -1697,6 +1697,11 @@ function addClearSearchButton() {
         catalogFilter.value = '';
         updateClearButton();
         applyFilters();
+
+        // UX: Restore focus to search input after clearing state
+        if (searchInput) {
+            searchInput.focus();
+        }
     });
 
     // Append to empty state content
