@@ -1697,6 +1697,10 @@ function addClearSearchButton() {
         catalogFilter.value = '';
         updateClearButton();
         applyFilters();
+
+        // Return focus to search input so user can immediately search again
+        // and to avoid focus dropping to the document body when this button is removed.
+        searchInput.focus();
     });
 
     // Append to empty state content
