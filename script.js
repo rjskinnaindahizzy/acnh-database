@@ -285,7 +285,7 @@ function setupEventListeners() {
         // UX: Loading state
         const originalBtnContent = refreshBtn.innerHTML;
         refreshBtn.disabled = true;
-        refreshBtn.innerHTML = '<span class="btn-spinner"></span> Refreshing...';
+        refreshBtn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> Refreshing...';
 
         await clearSheetCache(currentSheet);
         cancelPrefetch('manual refresh');
@@ -469,7 +469,7 @@ async function saveApiKey() {
     // UX: Loading state
     const originalBtnContent = saveApiKeyBtn.innerHTML;
     saveApiKeyBtn.disabled = true;
-    saveApiKeyBtn.innerHTML = '<span class="btn-spinner"></span> Saving...';
+    saveApiKeyBtn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> Saving...';
 
     try {
         const testUrl = `${API_BASE_URL}/${SPREADSHEET_ID}?key=${key}`;
@@ -1660,16 +1660,16 @@ function addRetryButton() {
     // Create retry button
     const retryBtn = document.createElement('button');
     retryBtn.id = 'retryButton';
-    retryBtn.textContent = '🔄 Retry';
+    retryBtn.innerHTML = '<span aria-hidden="true">🔄</span> Retry';
     retryBtn.className = 'action-btn retry-btn';
     styleActionButton(retryBtn, '#667eea');
 
     retryBtn.addEventListener('click', async () => {
         retryBtn.disabled = true;
-        retryBtn.textContent = 'Retrying...';
+        retryBtn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> Retrying...';
         await loadAvailableSheets();
         retryBtn.disabled = false;
-        retryBtn.textContent = '🔄 Retry';
+        retryBtn.innerHTML = '<span aria-hidden="true">🔄</span> Retry';
     });
 
     // Append to empty state content
@@ -1686,7 +1686,7 @@ function addClearSearchButton() {
     // Create clear button
     const clearBtn = document.createElement('button');
     clearBtn.id = 'clearSearchActionBtn';
-    clearBtn.textContent = '✕ Clear Search & Filters';
+    clearBtn.innerHTML = '<span aria-hidden="true">✕</span> Clear Search & Filters';
     clearBtn.className = 'action-btn clear-btn';
     clearBtn.setAttribute('aria-label', 'Clear all search terms and filters');
     styleActionButton(clearBtn, 'var(--primary)');
@@ -1697,6 +1697,9 @@ function addClearSearchButton() {
         catalogFilter.value = '';
         updateClearButton();
         applyFilters();
+
+        // Recover focus to search input since this button will be destroyed
+        searchInput.focus();
     });
 
     // Append to empty state content
@@ -1938,7 +1941,7 @@ function showToast(message, type = 'default') {
     }
 
     toast.innerHTML = `
-        <span class="toast-icon">${icon}</span>
+        <span class="toast-icon" aria-hidden="true">${icon}</span>
         <span>${message}</span>
     `;
 
