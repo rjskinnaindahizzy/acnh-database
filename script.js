@@ -59,6 +59,7 @@ const searchClearBtn = document.getElementById('searchClearBtn');
 const sheetSelect = document.getElementById('sheetSelect');
 const diyFilter = document.getElementById('diyFilter');
 const catalogFilter = document.getElementById('catalogFilter');
+const wrapTextBtn = document.getElementById('wrapTextBtn');
 const columnToggleBtn = document.getElementById('columnToggleBtn');
 const columnTogglePanel = document.getElementById('columnTogglePanel');
 const closeColumnToggle = document.getElementById('closeColumnToggle');
@@ -70,6 +71,7 @@ const emptyStateIcon = document.getElementById('emptyStateIcon');
 const emptyStateTitle = document.getElementById('emptyStateTitle');
 const emptyStateMessage = document.getElementById('emptyStateMessage');
 const resultsSection = document.getElementById('resultsSection');
+const dataTable = document.getElementById('dataTable');
 const tableHead = document.getElementById('tableHead');
 const tableBody = document.getElementById('tableBody');
 const recordCount = document.getElementById('recordCount');
@@ -111,6 +113,7 @@ function hideFiltersAndControls() {
     catalogFilter.style.display = 'none';
     columnToggleBtn.style.display = 'none';
     refreshBtn.style.display = 'none';
+    if (wrapTextBtn) wrapTextBtn.style.display = 'none';
     recordCount.style.display = 'none';
 }
 
@@ -118,6 +121,7 @@ function hideFiltersAndControls() {
 function showFiltersAndControls() {
     columnToggleBtn.style.display = 'block';
     refreshBtn.style.display = 'block';
+    if (wrapTextBtn) wrapTextBtn.style.display = 'block';
     recordCount.style.display = 'block';
     // DIY and Catalog filters shown based on sheet content via updateFilterVisibility()
 }
@@ -186,6 +190,31 @@ function setupEventListeners() {
             }
         }
     });
+
+    // Initialize text wrap preference
+    if (wrapTextBtn) {
+        const isWrapEnabled = localStorage.getItem('acnh_wrap_text') === 'true';
+        wrapTextBtn.setAttribute('aria-pressed', isWrapEnabled);
+        if (isWrapEnabled) {
+            dataTable.classList.add('wrap-text');
+        } else {
+            dataTable.classList.remove('wrap-text');
+        }
+
+        wrapTextBtn.addEventListener('click', () => {
+            const isCurrentlyPressed = wrapTextBtn.getAttribute('aria-pressed') === 'true';
+            const newState = !isCurrentlyPressed;
+
+            wrapTextBtn.setAttribute('aria-pressed', newState);
+            if (newState) {
+                dataTable.classList.add('wrap-text');
+            } else {
+                dataTable.classList.remove('wrap-text');
+            }
+
+            localStorage.setItem('acnh_wrap_text', newState);
+        });
+    }
 
     // Auto-load on sheet selection
     sheetSelect.addEventListener('change', async () => {
@@ -1697,6 +1726,10 @@ function addClearSearchButton() {
         catalogFilter.value = '';
         updateClearButton();
         applyFilters();
+
+        // Return focus to search input so keyboard users don't lose their place
+        // since the clear button gets removed from the DOM
+        searchInput.focus();
     });
 
     // Append to empty state content
