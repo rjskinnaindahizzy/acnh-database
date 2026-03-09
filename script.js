@@ -60,6 +60,7 @@ const sheetSelect = document.getElementById('sheetSelect');
 const diyFilter = document.getElementById('diyFilter');
 const catalogFilter = document.getElementById('catalogFilter');
 const columnToggleBtn = document.getElementById('columnToggleBtn');
+const wrapTextBtn = document.getElementById('wrapTextBtn');
 const columnTogglePanel = document.getElementById('columnTogglePanel');
 const closeColumnToggle = document.getElementById('closeColumnToggle');
 const refreshBtn = document.getElementById('refreshBtn');
@@ -110,6 +111,7 @@ function hideFiltersAndControls() {
     diyFilter.style.display = 'none';
     catalogFilter.style.display = 'none';
     columnToggleBtn.style.display = 'none';
+    if (wrapTextBtn) wrapTextBtn.style.display = 'none';
     refreshBtn.style.display = 'none';
     recordCount.style.display = 'none';
 }
@@ -117,6 +119,7 @@ function hideFiltersAndControls() {
 // Show filters and controls
 function showFiltersAndControls() {
     columnToggleBtn.style.display = 'block';
+    if (wrapTextBtn) wrapTextBtn.style.display = 'block';
     refreshBtn.style.display = 'block';
     recordCount.style.display = 'block';
     // DIY and Catalog filters shown based on sheet content via updateFilterVisibility()
@@ -275,6 +278,34 @@ function setupEventListeners() {
     columnTogglePanel.addEventListener('click', (e) => {
         e.stopPropagation();
     });
+
+    // Wrap Text toggle
+    if (wrapTextBtn) {
+        // Initialize from localStorage
+        const isWrapText = localStorage.getItem('acnh_wrap_text') === 'true';
+        if (isWrapText) {
+            wrapTextBtn.setAttribute('aria-pressed', 'true');
+            const dataTable = document.getElementById('dataTable');
+            if (dataTable) dataTable.classList.add('wrap-text');
+        }
+
+        wrapTextBtn.addEventListener('click', () => {
+            const isPressed = wrapTextBtn.getAttribute('aria-pressed') === 'true';
+            const newState = !isPressed;
+
+            wrapTextBtn.setAttribute('aria-pressed', String(newState));
+            localStorage.setItem('acnh_wrap_text', String(newState));
+
+            const dataTable = document.getElementById('dataTable');
+            if (dataTable) {
+                if (newState) {
+                    dataTable.classList.add('wrap-text');
+                } else {
+                    dataTable.classList.remove('wrap-text');
+                }
+            }
+        });
+    }
 
     refreshBtn.addEventListener('click', async () => {
         if (!currentSheet) {
