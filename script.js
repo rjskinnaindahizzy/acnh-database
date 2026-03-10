@@ -62,6 +62,7 @@ const catalogFilter = document.getElementById('catalogFilter');
 const columnToggleBtn = document.getElementById('columnToggleBtn');
 const columnTogglePanel = document.getElementById('columnTogglePanel');
 const closeColumnToggle = document.getElementById('closeColumnToggle');
+const wrapTextBtn = document.getElementById('wrapTextBtn');
 const refreshBtn = document.getElementById('refreshBtn');
 const columnCheckboxes = document.getElementById('columnCheckboxes');
 const loading = document.getElementById('loading');
@@ -70,6 +71,7 @@ const emptyStateIcon = document.getElementById('emptyStateIcon');
 const emptyStateTitle = document.getElementById('emptyStateTitle');
 const emptyStateMessage = document.getElementById('emptyStateMessage');
 const resultsSection = document.getElementById('resultsSection');
+const dataTable = document.getElementById('dataTable');
 const tableHead = document.getElementById('tableHead');
 const tableBody = document.getElementById('tableBody');
 const recordCount = document.getElementById('recordCount');
@@ -84,6 +86,15 @@ let dbPromise = null;
 async function init() {
     loadApiKeyFromStorage();
     setupEventListeners();
+
+    // Initialize Wrap Text state
+    const isWrapText = localStorage.getItem('acnh_wrap_text') === 'true';
+    if (wrapTextBtn) {
+        wrapTextBtn.setAttribute('aria-pressed', isWrapText.toString());
+    }
+    if (dataTable) {
+        dataTable.classList.toggle('wrap-text', isWrapText);
+    }
 
     // Hide filters, columns button, and stats initially
     hideFiltersAndControls();
@@ -110,6 +121,7 @@ function hideFiltersAndControls() {
     diyFilter.style.display = 'none';
     catalogFilter.style.display = 'none';
     columnToggleBtn.style.display = 'none';
+    if (wrapTextBtn) wrapTextBtn.style.display = 'none';
     refreshBtn.style.display = 'none';
     recordCount.style.display = 'none';
 }
@@ -117,6 +129,7 @@ function hideFiltersAndControls() {
 // Show filters and controls
 function showFiltersAndControls() {
     columnToggleBtn.style.display = 'block';
+    if (wrapTextBtn) wrapTextBtn.style.display = 'block';
     refreshBtn.style.display = 'block';
     recordCount.style.display = 'block';
     // DIY and Catalog filters shown based on sheet content via updateFilterVisibility()
@@ -229,6 +242,17 @@ function setupEventListeners() {
     // Filter changes
     diyFilter.addEventListener('change', applyFilters);
     catalogFilter.addEventListener('change', applyFilters);
+
+    // Wrap Text Toggle
+    if (wrapTextBtn && dataTable) {
+        wrapTextBtn.addEventListener('click', () => {
+            const isPressed = wrapTextBtn.getAttribute('aria-pressed') === 'true';
+            const newState = !isPressed;
+            wrapTextBtn.setAttribute('aria-pressed', newState.toString());
+            dataTable.classList.toggle('wrap-text', newState);
+            localStorage.setItem('acnh_wrap_text', newState.toString());
+        });
+    }
 
     // Column toggle
     columnToggleBtn.addEventListener('click', (e) => {

@@ -237,6 +237,7 @@ button {
     background: var(--primary-strong);
 }
 
+#wrapTextBtn,
 #refreshBtn {
     background: var(--soft);
     color: #4a5568;
@@ -244,10 +245,17 @@ button {
     padding: 12px 18px;
 }
 
+#wrapTextBtn:hover:not(:disabled),
 #refreshBtn:hover:not(:disabled) {
     background: var(--accent-soft);
     color: #2d3748;
     transform: translateY(-1px);
+}
+
+#wrapTextBtn[aria-pressed="true"] {
+    background: var(--accent);
+    color: white;
+    box-shadow: inset 0 3px 6px rgba(0,0,0,0.1);
 }
 
 #refreshBtn:disabled {
@@ -773,6 +781,13 @@ td {
 td.expanded {
     white-space: normal;
     word-wrap: break-word;
+}
+
+#dataTable.wrap-text td {
+    white-space: normal;
+    word-wrap: break-word;
+    overflow: visible;
+    text-overflow: clip;
 }
 
 td:hover {

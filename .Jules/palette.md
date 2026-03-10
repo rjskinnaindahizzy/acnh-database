@@ -28,3 +28,7 @@
 ## 2026-01-27 - [Skip Link Implementation]
 **Learning:** Adding a "Skip to Content" link requires ensuring the target container is programmatically focusable using `tabindex="-1"`. Without this, the browser scrolls but focus remains on the link, forcing the user to tab through everything again.
 **Action:** Always wrap main content in a `<main id="main-content" tabindex="-1">` container when implementing skip links.
+
+## 2026-01-28 - [Accessible Text Truncation and Wrap Toggles]
+**Learning:** Truncating text in data tables keeps layouts clean, but using `title` to show the full text forces users to hover. Providing a "Wrap Text" toggle gives users control over information density and readability, and using `aria-pressed` ensures screen readers understand the toggle state.
+**Action:** When truncating significant data table text, provide a "Wrap Text" toggle with `aria-pressed` state and persist user preference via `localStorage`.
