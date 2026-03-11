@@ -59,6 +59,7 @@ const searchClearBtn = document.getElementById('searchClearBtn');
 const sheetSelect = document.getElementById('sheetSelect');
 const diyFilter = document.getElementById('diyFilter');
 const catalogFilter = document.getElementById('catalogFilter');
+const wrapTextBtn = document.getElementById('wrapTextBtn');
 const columnToggleBtn = document.getElementById('columnToggleBtn');
 const columnTogglePanel = document.getElementById('columnTogglePanel');
 const closeColumnToggle = document.getElementById('closeColumnToggle');
@@ -70,6 +71,7 @@ const emptyStateIcon = document.getElementById('emptyStateIcon');
 const emptyStateTitle = document.getElementById('emptyStateTitle');
 const emptyStateMessage = document.getElementById('emptyStateMessage');
 const resultsSection = document.getElementById('resultsSection');
+const dataTable = document.getElementById('dataTable');
 const tableHead = document.getElementById('tableHead');
 const tableBody = document.getElementById('tableBody');
 const recordCount = document.getElementById('recordCount');
@@ -84,6 +86,12 @@ let dbPromise = null;
 async function init() {
     loadApiKeyFromStorage();
     setupEventListeners();
+
+    // Load wrap text preference
+    if (localStorage.getItem('acnh_wrap_text') === 'true') {
+        wrapTextBtn.setAttribute('aria-pressed', 'true');
+        dataTable.classList.add('wrap-text');
+    }
 
     // Hide filters, columns button, and stats initially
     hideFiltersAndControls();
@@ -109,6 +117,7 @@ async function init() {
 function hideFiltersAndControls() {
     diyFilter.style.display = 'none';
     catalogFilter.style.display = 'none';
+    wrapTextBtn.style.display = 'none';
     columnToggleBtn.style.display = 'none';
     refreshBtn.style.display = 'none';
     recordCount.style.display = 'none';
@@ -116,6 +125,7 @@ function hideFiltersAndControls() {
 
 // Show filters and controls
 function showFiltersAndControls() {
+    wrapTextBtn.style.display = 'block';
     columnToggleBtn.style.display = 'block';
     refreshBtn.style.display = 'block';
     recordCount.style.display = 'block';
@@ -229,6 +239,13 @@ function setupEventListeners() {
     // Filter changes
     diyFilter.addEventListener('change', applyFilters);
     catalogFilter.addEventListener('change', applyFilters);
+
+    // Wrap Text toggle
+    wrapTextBtn.addEventListener('click', () => {
+        const isWrapped = dataTable.classList.toggle('wrap-text');
+        wrapTextBtn.setAttribute('aria-pressed', isWrapped);
+        localStorage.setItem('acnh_wrap_text', isWrapped);
+    });
 
     // Column toggle
     columnToggleBtn.addEventListener('click', (e) => {
