@@ -1029,7 +1029,6 @@ function displayData(data, isMultiSheet) {
         th.title = `Click to sort by ${header}`;
         th.className = 'sortable';
         th.tabIndex = 0;
-        th.setAttribute('role', 'button');
 
         // Add sort indicators
         if (sortColumn === header) {
@@ -1697,6 +1696,7 @@ function addClearSearchButton() {
         catalogFilter.value = '';
         updateClearButton();
         applyFilters();
+        searchInput.focus();
     });
 
     // Append to empty state content
