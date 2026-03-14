@@ -61,7 +61,6 @@ const diyFilter = document.getElementById('diyFilter');
 const catalogFilter = document.getElementById('catalogFilter');
 const wrapTextBtn = document.getElementById('wrapTextBtn');
 const columnToggleBtn = document.getElementById('columnToggleBtn');
-const wrapTextBtn = document.getElementById('wrapTextBtn');
 const columnTogglePanel = document.getElementById('columnTogglePanel');
 const closeColumnToggle = document.getElementById('closeColumnToggle');
 const refreshBtn = document.getElementById('refreshBtn');
@@ -87,14 +86,6 @@ let dbPromise = null;
 async function init() {
     loadApiKeyFromStorage();
     setupEventListeners();
-
-    // Check saved wrap text preference
-    const savedWrapText = localStorage.getItem('acnh_wrap_text');
-    if (savedWrapText === 'true') {
-        const dataTable = document.getElementById('dataTable');
-        if (dataTable) dataTable.classList.add('wrap-text');
-        if (wrapTextBtn) wrapTextBtn.setAttribute('aria-pressed', 'true');
-    }
 
     // Hide filters, columns button, and stats initially
     hideFiltersAndControls();
@@ -123,7 +114,6 @@ function hideFiltersAndControls() {
     columnToggleBtn.style.display = 'none';
     if (wrapTextBtn) wrapTextBtn.style.display = 'none';
     refreshBtn.style.display = 'none';
-    if (wrapTextBtn) wrapTextBtn.style.display = 'none';
     recordCount.style.display = 'none';
 }
 
@@ -132,7 +122,6 @@ function showFiltersAndControls() {
     columnToggleBtn.style.display = 'block';
     if (wrapTextBtn) wrapTextBtn.style.display = 'block';
     refreshBtn.style.display = 'block';
-    if (wrapTextBtn) wrapTextBtn.style.display = 'block';
     recordCount.style.display = 'block';
     // DIY and Catalog filters shown based on sheet content via updateFilterVisibility()
 }
@@ -269,16 +258,6 @@ function setupEventListeners() {
     // Filter changes
     diyFilter.addEventListener('change', applyFilters);
     catalogFilter.addEventListener('change', applyFilters);
-
-    // Wrap text toggle
-    if (wrapTextBtn) {
-        wrapTextBtn.addEventListener('click', () => {
-            const dataTable = document.getElementById('dataTable');
-            const isWrapped = dataTable.classList.toggle('wrap-text');
-            wrapTextBtn.setAttribute('aria-pressed', String(isWrapped));
-            localStorage.setItem('acnh_wrap_text', String(isWrapped));
-        });
-    }
 
     // Column toggle
     columnToggleBtn.addEventListener('click', (e) => {
