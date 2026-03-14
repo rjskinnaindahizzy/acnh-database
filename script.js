@@ -361,6 +361,24 @@ function setupEventListeners() {
         }
     });
 
+    // Skip to results link functionality
+    const skipLink = document.querySelector('.skip-link');
+    if (skipLink) {
+        skipLink.addEventListener('click', (e) => {
+            const targetId = skipLink.getAttribute('href');
+            if (targetId && targetId.startsWith('#')) {
+                const target = document.querySelector(targetId);
+                if (target) {
+                    // Ensure the target is focusable
+                    if (!target.hasAttribute('tabindex')) {
+                        target.setAttribute('tabindex', '-1');
+                    }
+                    target.focus();
+                }
+            }
+        });
+    }
+
     // Back to Top functionality
     const backToTopBtn = document.getElementById('backToTopBtn');
     if (backToTopBtn) {

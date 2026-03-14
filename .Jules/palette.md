@@ -25,6 +25,9 @@
 **Learning:** Users appreciate when the application remembers their context (like selected sheet) after a reload. It reduces friction and makes the app feel smarter.
 **Action:** Use `localStorage` to persist transient user state (filters, selections) where appropriate, always validating the restored value against current available options.
 
+## 2026-01-23 - [Keyboard Navigation & Skip Links]
+**Learning:** Programmatically scrolling to the top (e.g., via a Skip Link) moves the viewport but not the keyboard focus, leaving the user navigating from their previous position.
+**Action:** Always move focus explicitly to the target element (using `tabindex="-1"` and `.focus()`) when implementing skip links or scroll-to-top buttons to ensure the keyboard sequence resets correctly.
 ## 2026-01-27 - [Skip Link Implementation]
 **Learning:** Adding a "Skip to Content" link requires ensuring the target container is programmatically focusable using `tabindex="-1"`. Without this, the browser scrolls but focus remains on the link, forcing the user to tab through everything again.
 **Action:** Always wrap main content in a `<main id="main-content" tabindex="-1">` container when implementing skip links.
