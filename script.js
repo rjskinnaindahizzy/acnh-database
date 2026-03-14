@@ -1332,6 +1332,7 @@ function renderPagination(totalRecords) {
                 currentPage--;
                 displayData(currentData);
                 updateRecordCount();
+                resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         });
         paginationDiv.appendChild(prevBtn);
@@ -1353,6 +1354,7 @@ function renderPagination(totalRecords) {
                 currentPage++;
                 displayData(currentData);
                 updateRecordCount();
+                resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         });
         paginationDiv.appendChild(nextBtn);
