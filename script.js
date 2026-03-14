@@ -59,6 +59,7 @@ const searchClearBtn = document.getElementById('searchClearBtn');
 const sheetSelect = document.getElementById('sheetSelect');
 const diyFilter = document.getElementById('diyFilter');
 const catalogFilter = document.getElementById('catalogFilter');
+const wrapTextBtn = document.getElementById('wrapTextBtn');
 const columnToggleBtn = document.getElementById('columnToggleBtn');
 const wrapTextBtn = document.getElementById('wrapTextBtn');
 const columnTogglePanel = document.getElementById('columnTogglePanel');
@@ -71,6 +72,7 @@ const emptyStateIcon = document.getElementById('emptyStateIcon');
 const emptyStateTitle = document.getElementById('emptyStateTitle');
 const emptyStateMessage = document.getElementById('emptyStateMessage');
 const resultsSection = document.getElementById('resultsSection');
+const dataTable = document.getElementById('dataTable');
 const tableHead = document.getElementById('tableHead');
 const tableBody = document.getElementById('tableBody');
 const recordCount = document.getElementById('recordCount');
@@ -121,6 +123,7 @@ function hideFiltersAndControls() {
     columnToggleBtn.style.display = 'none';
     if (wrapTextBtn) wrapTextBtn.style.display = 'none';
     refreshBtn.style.display = 'none';
+    if (wrapTextBtn) wrapTextBtn.style.display = 'none';
     recordCount.style.display = 'none';
 }
 
@@ -129,6 +132,7 @@ function showFiltersAndControls() {
     columnToggleBtn.style.display = 'block';
     if (wrapTextBtn) wrapTextBtn.style.display = 'block';
     refreshBtn.style.display = 'block';
+    if (wrapTextBtn) wrapTextBtn.style.display = 'block';
     recordCount.style.display = 'block';
     // DIY and Catalog filters shown based on sheet content via updateFilterVisibility()
 }
@@ -197,6 +201,31 @@ function setupEventListeners() {
             }
         }
     });
+
+    // Initialize text wrap preference
+    if (wrapTextBtn) {
+        const isWrapEnabled = localStorage.getItem('acnh_wrap_text') === 'true';
+        wrapTextBtn.setAttribute('aria-pressed', isWrapEnabled);
+        if (isWrapEnabled) {
+            dataTable.classList.add('wrap-text');
+        } else {
+            dataTable.classList.remove('wrap-text');
+        }
+
+        wrapTextBtn.addEventListener('click', () => {
+            const isCurrentlyPressed = wrapTextBtn.getAttribute('aria-pressed') === 'true';
+            const newState = !isCurrentlyPressed;
+
+            wrapTextBtn.setAttribute('aria-pressed', newState);
+            if (newState) {
+                dataTable.classList.add('wrap-text');
+            } else {
+                dataTable.classList.remove('wrap-text');
+            }
+
+            localStorage.setItem('acnh_wrap_text', newState);
+        });
+    }
 
     // Auto-load on sheet selection
     sheetSelect.addEventListener('change', async () => {
@@ -306,7 +335,7 @@ function setupEventListeners() {
         // UX: Loading state
         const originalBtnContent = refreshBtn.innerHTML;
         refreshBtn.disabled = true;
-        refreshBtn.innerHTML = '<span class="btn-spinner"></span> Refreshing...';
+        refreshBtn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> Refreshing...';
 
         await clearSheetCache(currentSheet);
         cancelPrefetch('manual refresh');
@@ -352,6 +381,24 @@ function setupEventListeners() {
             saveApiKey();
         }
     });
+
+    // Skip to results link functionality
+    const skipLink = document.querySelector('.skip-link');
+    if (skipLink) {
+        skipLink.addEventListener('click', (e) => {
+            const targetId = skipLink.getAttribute('href');
+            if (targetId && targetId.startsWith('#')) {
+                const target = document.querySelector(targetId);
+                if (target) {
+                    // Ensure the target is focusable
+                    if (!target.hasAttribute('tabindex')) {
+                        target.setAttribute('tabindex', '-1');
+                    }
+                    target.focus();
+                }
+            }
+        });
+    }
 
     // Back to Top functionality
     const backToTopBtn = document.getElementById('backToTopBtn');
@@ -490,7 +537,7 @@ async function saveApiKey() {
     // UX: Loading state
     const originalBtnContent = saveApiKeyBtn.innerHTML;
     saveApiKeyBtn.disabled = true;
-    saveApiKeyBtn.innerHTML = '<span class="btn-spinner"></span> Saving...';
+    saveApiKeyBtn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> Saving...';
 
     try {
         const testUrl = `${API_BASE_URL}/${SPREADSHEET_ID}?key=${key}`;
@@ -1681,16 +1728,16 @@ function addRetryButton() {
     // Create retry button
     const retryBtn = document.createElement('button');
     retryBtn.id = 'retryButton';
-    retryBtn.textContent = '🔄 Retry';
+    retryBtn.innerHTML = '<span aria-hidden="true">🔄</span> Retry';
     retryBtn.className = 'action-btn retry-btn';
     styleActionButton(retryBtn, '#667eea');
 
     retryBtn.addEventListener('click', async () => {
         retryBtn.disabled = true;
-        retryBtn.textContent = 'Retrying...';
+        retryBtn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> Retrying...';
         await loadAvailableSheets();
         retryBtn.disabled = false;
-        retryBtn.textContent = '🔄 Retry';
+        retryBtn.innerHTML = '<span aria-hidden="true">🔄</span> Retry';
     });
 
     // Append to empty state content
@@ -1707,7 +1754,7 @@ function addClearSearchButton() {
     // Create clear button
     const clearBtn = document.createElement('button');
     clearBtn.id = 'clearSearchActionBtn';
-    clearBtn.textContent = '✕ Clear Search & Filters';
+    clearBtn.innerHTML = '<span aria-hidden="true">✕</span> Clear Search & Filters';
     clearBtn.className = 'action-btn clear-btn';
     clearBtn.setAttribute('aria-label', 'Clear all search terms and filters');
     styleActionButton(clearBtn, 'var(--primary)');
@@ -1718,6 +1765,9 @@ function addClearSearchButton() {
         catalogFilter.value = '';
         updateClearButton();
         applyFilters();
+
+        // Recover focus to search input since this button will be destroyed
+        searchInput.focus();
     });
 
     // Append to empty state content
@@ -1959,7 +2009,7 @@ function showToast(message, type = 'default') {
     }
 
     toast.innerHTML = `
-        <span class="toast-icon">${icon}</span>
+        <span class="toast-icon" aria-hidden="true">${icon}</span>
         <span>${message}</span>
     `;
 
