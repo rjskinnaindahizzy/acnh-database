@@ -31,7 +31,7 @@
                 <div class="input-wrapper">
                     <input type="text" id="searchInput" placeholder="Search for items, villagers, or anything..." aria-label="Search items and villagers">
                     <kbd class="search-shortcut" aria-hidden="true">/</kbd>
-                    <button id="searchClearBtn" class="input-action-btn" aria-label="Clear search" title="Clear search" style="display: none;">✕</button>
+                    <button id="searchClearBtn" class="input-action-btn" aria-label="Clear search" title="Clear search" style="display: none;"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
                 </div>
             </div>
 
@@ -40,7 +40,7 @@
                     <option value="">Loading sheets...</option>
                 </select>
 
-                <button id="refreshBtn" title="Reload current sheet" aria-label="Reload current sheet">↻ Refresh</button>
+                <button id="refreshBtn" title="Reload current sheet" aria-label="Reload current sheet"><span aria-hidden="true">↻</span> Refresh</button>
 
                 <select id="diyFilter" aria-label="Filter by DIY status">
                     <option value="">DIY: All</option>
@@ -55,7 +55,7 @@
                     <option value="Not in catalog">Not in catalog</option>
                 </select>
 
-                <button id="columnToggleBtn" aria-label="Toggle columns" aria-expanded="false" aria-controls="columnTogglePanel" aria-haspopup="dialog">📋 Columns</button>
+                <button id="columnToggleBtn" aria-label="Toggle columns" aria-expanded="false" aria-controls="columnTogglePanel" aria-haspopup="dialog"><span aria-hidden="true">📋</span> Columns</button>
             </div>
 
             <div class="stats">
@@ -65,7 +65,7 @@
             <div class="column-toggle-panel" id="columnTogglePanel" style="display: none;" role="dialog" aria-modal="false" aria-labelledby="columnToggleTitle">
                 <div class="column-toggle-header">
                     <h3 id="columnToggleTitle">Show/Hide Columns</h3>
-                    <button id="closeColumnToggle" aria-label="Close column settings">✕</button>
+                    <button id="closeColumnToggle" aria-label="Close column settings"><span aria-hidden="true">✕</span></button>
                 </div>
                 <div id="columnCheckboxes"></div>
             </div>
@@ -97,13 +97,24 @@
                         <span class="hint-icon" aria-hidden="true">📋</span>
                         <span>Click the Columns button to customize your view</span>
                     </div>
-                    <div class="hint-item">
-                        <span class="hint-icon" aria-hidden="true">📥</span>
-                        <span>Export your filtered results to CSV</span>
+                    <h2 id="emptyStateTitle">Welcome to ACNH Database!</h2>
+                    <p id="emptyStateMessage">Select a sheet from the dropdown above to explore items, villagers, and more.</p>
+                    <div class="empty-state-hints">
+                        <div class="hint-item">
+                            <span class="hint-icon" aria-hidden="true">🔍</span>
+                            <span>Use the search bar to find items across all sheets</span>
+                        </div>
+                        <div class="hint-item">
+                            <span class="hint-icon" aria-hidden="true">📋</span>
+                            <span>Click the Columns button to customize your view</span>
+                        </div>
+                        <div class="hint-item">
+                            <span class="hint-icon" aria-hidden="true">📥</span>
+                            <span>Export your filtered results to CSV</span>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
             <div class="results-section" id="resultsSection" style="display: none;">
                 <div class="table-container">
