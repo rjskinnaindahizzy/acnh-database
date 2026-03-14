@@ -800,7 +800,7 @@ function createDataRow(row, hdrs, searchQuery) {
             } else {
                 td.textContent = value;
             }
-            td.title = 'Click to expand';
+            td.title = `${value} (Click to expand)`;
             td.addEventListener('click', function() {
                 this.classList.toggle('expanded');
             });
