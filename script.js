@@ -119,9 +119,9 @@ function hideFiltersAndControls() {
 
 // Show filters and controls
 function showFiltersAndControls() {
-    columnToggleBtn.style.display = 'block';
-    if (wrapTextBtn) wrapTextBtn.style.display = 'block';
-    refreshBtn.style.display = 'block';
+    columnToggleBtn.style.display = 'flex';
+    if (wrapTextBtn) wrapTextBtn.style.display = 'flex';
+    refreshBtn.style.display = 'flex';
     recordCount.style.display = 'block';
     // DIY and Catalog filters shown based on sheet content via updateFilterVisibility()
 }
@@ -1304,6 +1304,7 @@ function renderPagination(totalRecords) {
         const prevBtn = document.createElement('button');
         prevBtn.innerHTML = '<span aria-hidden="true">←</span> Previous';
         prevBtn.setAttribute('aria-label', 'Go to previous page');
+        prevBtn.dataset.action = 'prev';
         prevBtn.disabled = currentPage === 1;
         prevBtn.addEventListener('click', () => {
             if (currentPage > 1) {
@@ -1326,6 +1327,7 @@ function renderPagination(totalRecords) {
         const nextBtn = document.createElement('button');
         nextBtn.innerHTML = 'Next <span aria-hidden="true">→</span>';
         nextBtn.setAttribute('aria-label', 'Go to next page');
+        nextBtn.dataset.action = 'next';
         nextBtn.disabled = currentPage === totalPages;
         nextBtn.addEventListener('click', () => {
             if (currentPage < totalPages) {
@@ -1353,12 +1355,8 @@ function renderPagination(totalRecords) {
 
     // Restore focus if needed (must be done after appending to DOM)
     if (shouldFocusPagination && totalPages > 1) {
-        // Find buttons in the new pagination div
-        // We know the structure: Prev is first child, Next is third (Prev, Span, Next, Export)
-        // Safer to find by text content or keeping references
-        const buttons = paginationDiv.querySelectorAll('button');
-        const prevBtn = Array.from(buttons).find(b => b.textContent.includes('Previous'));
-        const nextBtn = Array.from(buttons).find(b => b.textContent.includes('Next'));
+        const prevBtn = paginationDiv.querySelector('button[data-action="prev"]');
+        const nextBtn = paginationDiv.querySelector('button[data-action="next"]');
 
         if (shouldFocusPagination === 'next') {
             if (nextBtn && !nextBtn.disabled) {
@@ -1521,26 +1519,25 @@ async function applyFilters() {
 function setupHeadersForDisplay(isMultiSheet, data) {
     if (isMultiSheet) {
         // Multi-sheet results - show common columns plus Sheet column
-        const allHeaders = new Set();
+        const headerSet = new Set();
         data.forEach(row => {
             Object.keys(row).forEach(key => {
                 if (key !== '_sheet') {
-                    allHeaders.add(key);
+                    headerSet.add(key);
                 }
             });
         });
 
         // Prioritize Name and Image, then add Sheet
         visibleColumns = ['Sheet'];
-        if (allHeaders.has('Name')) visibleColumns.push('Name');
-        if (allHeaders.has('Image')) visibleColumns.push('Image');
+        if (headerSet.has('Name')) visibleColumns.push('Name');
+        if (headerSet.has('Image')) visibleColumns.push('Image');
 
         // Add other common columns
-        const commonCols = Array.from(allHeaders).filter(h => h !== 'Name' && h !== 'Image');
+        const commonCols = Array.from(headerSet).filter(h => h !== 'Name' && h !== 'Image');
         visibleColumns = visibleColumns.concat(commonCols.slice(0, 8)); // Limit to reasonable number
 
         headers = visibleColumns;
-        allHeaders.clear();
 
     } else if (currentSheet && allSheetsData[currentSheet]) {
         // Single sheet - use preset columns
@@ -1595,17 +1592,6 @@ function updateRecordCount() {
         } else {
             recordCount.textContent = `Showing ${total} of ${allData.length} records`;
         }
-    }
-}
-
-// Show/hide loading indicator
-function showLoading(show) {
-    loading.style.display = show ? 'block' : 'none';
-    if (!show) {
-        resultsSection.style.display = allData.length > 0 ? 'block' : 'none';
-    } else {
-        resultsSection.style.display = 'none';
-        emptyState.style.display = 'none';
     }
 }
 
@@ -1851,11 +1837,6 @@ function scheduleNextPrefetch(token) {
     }
 }
 
-// Add button to show API key section again if needed
-function showApiKeySection() {
-    apiKeySection.style.display = 'flex';
-}
-
 // Export data to CSV
 function exportToCSV(e) {
     if (currentData.length === 0) {
@@ -1907,6 +1888,7 @@ function exportToCSV(e) {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(url);
 
         showToast(`Exported ${currentData.length} items successfully`, 'success');
     } catch (error) {

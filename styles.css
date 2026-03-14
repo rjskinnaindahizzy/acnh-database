@@ -3,6 +3,8 @@
     --primary-hover: #0aa599;
     --accent: #ffdb58;
     --accent-strong: #e6c200;
+    --accent-soft: #fff3cd;
+    --soft: #fffbef;
     --text: #2c3e50;
     --bg: #f9f9f9;
     --card-bg: #ffffff;
@@ -65,17 +67,18 @@ header h1:focus-visible {
     left: 0;
     background: var(--primary);
     color: white;
-    padding: 8px;
-    z-index: 100;
+    padding: 8px 16px;
+    z-index: 2000;
     transition: top 0.2s;
     text-decoration: none;
     font-weight: bold;
-    border-radius: 0 0 4px 0;
+    border-bottom-right-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
 
 .skip-link:focus {
     top: 0;
-    outline: 2px solid var(--accent);
+    outline: 2px solid white;
     outline-offset: -2px;
 }
 
@@ -609,7 +612,9 @@ td.image-cell {
 
 /* Truncate long text cells */
 td {
-    max-width: 250px;
+    padding: 12px 15px;
+    font-size: 14px;
+    max-width: 300px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -620,9 +625,22 @@ td.expanded {
     word-break: break-word;
 }
 
+.wrap-text td {
+    white-space: normal;
+    overflow-wrap: break-word;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+td:hover {
+    cursor: pointer;
+}
+
 /* Sheet Separator */
 .sheet-separator td {
     background: #eef2f7;
+}
+
 /* Variant grouping styles */
 .group-row {
     border-left: 3px solid var(--primary);
@@ -684,12 +702,12 @@ td.expanded {
 
 footer {
     background: #fdfaf1;
-    padding: 30px 40px;
+    padding: 20px;
     text-align: center;
-    font-weight: bold;
     color: #555;
-    padding: 10px;
+    font-size: 0.9rem;
     border-top: 2px solid #dde2e9;
+    margin-top: 50px;
 }
 
 /* Highlighted text */
@@ -755,40 +773,6 @@ mark {
     background: #38b2ac;
     color: white;
     border-color: #38b2ac;
-}
-
-/* Footer */
-footer {
-    text-align: center;
-    margin-top: 50px;
-    padding: 20px;
-    color: #888;
-    font-size: 0.9rem;
-/* Enhanced table cell styling */
-td {
-    padding: 12px 15px;
-    border-bottom: 1px solid #f0f0f0;
-    font-size: 14px;
-    max-width: 300px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-td.expanded {
-    white-space: normal;
-    word-wrap: break-word;
-}
-
-.wrap-text td {
-    white-space: normal;
-    word-wrap: break-word;
-    overflow: visible;
-    text-overflow: clip;
-}
-
-td:hover {
-    cursor: pointer;
 }
 
 footer a {
@@ -912,29 +896,3 @@ footer a:hover {
     }
 }
 
-/* Skip Link */
-.skip-link {
-    position: absolute;
-    top: -40px;
-    left: 0;
-    background: var(--primary);
-    color: white;
-    padding: 8px 16px;
-    z-index: 2000;
-    transition: top 0.2s;
-    font-weight: bold;
-    text-decoration: none;
-    border-bottom-right-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
-
-.skip-link:focus {
-    top: 0;
-    outline: 2px solid white;
-    outline-offset: -2px;
-}
-
-#main-content-area:focus {
-    outline: 2px solid var(--primary);
-    outline-offset: 2px;
-}
