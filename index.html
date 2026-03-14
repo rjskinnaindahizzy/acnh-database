@@ -42,7 +42,7 @@
                     <option value="">Loading sheets...</option>
                 </select>
 
-                <button id="refreshBtn" title="Reload current sheet" aria-label="Reload current sheet">↻ Refresh</button>
+                <button id="refreshBtn" title="Reload current sheet" aria-label="Reload current sheet"><span aria-hidden="true">↻</span> Refresh</button>
 
                 <select id="diyFilter" aria-label="Filter by DIY status">
                     <option value="">DIY: All</option>
@@ -57,9 +57,7 @@
                     <option value="Not in catalog">Not in catalog</option>
                 </select>
 
-                <button id="wrapTextBtn" aria-pressed="false" aria-label="Toggle text wrapping"><span aria-hidden="true">⤵</span> Wrap</button>
-
-                <button id="columnToggleBtn" aria-label="Toggle columns" aria-expanded="false" aria-controls="columnTogglePanel" aria-haspopup="dialog">📋 Columns</button>
+                <button id="columnToggleBtn" aria-label="Toggle columns" aria-expanded="false" aria-controls="columnTogglePanel" aria-haspopup="dialog"><span aria-hidden="true">📋</span> Columns</button>
             </div>
 
             <div class="stats">
@@ -69,7 +67,7 @@
             <div class="column-toggle-panel" id="columnTogglePanel" style="display: none;" role="dialog" aria-modal="false" aria-labelledby="columnToggleTitle">
                 <div class="column-toggle-header">
                     <h3 id="columnToggleTitle">Show/Hide Columns</h3>
-                    <button id="closeColumnToggle" aria-label="Close column settings">✕</button>
+                    <button id="closeColumnToggle" aria-label="Close column settings"><span aria-hidden="true">✕</span></button>
                 </div>
                 <div id="columnCheckboxes"></div>
             </div>
