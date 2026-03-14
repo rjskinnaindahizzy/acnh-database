@@ -32,3 +32,6 @@
 ## 2026-01-27 - [Focus Recovery on Destructive UI Changes]
 **Learning:** When interactive elements (like an empty state clear button) remove themselves from the DOM, focus falls back to the document body. This disrupts the navigation sequence for keyboard users.
 **Action:** Explicitly manage focus when replacing or destroying interactive UI components. Programmatically move focus to a logical next step (like a search input) to preserve a continuous, accessible flow.
+## 2026-03-08 - [Empty State Focus Recovery]
+**Learning:** When interactive elements (like a "Clear Search & Filters" button in an empty state) remove themselves from the DOM upon interaction, the browser drops keyboard focus back to the `document.body`. This forces keyboard users to tab back through the entire page header to get back to where they were.
+**Action:** When a button action results in its own destruction (e.g., clearing state), programmatically shift focus to the next logical element (like the search input) to preserve the user's flow.
