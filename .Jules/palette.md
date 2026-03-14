@@ -28,3 +28,7 @@
 ## 2026-01-27 - [Skip Link Implementation]
 **Learning:** Adding a "Skip to Content" link requires ensuring the target container is programmatically focusable using `tabindex="-1"`. Without this, the browser scrolls but focus remains on the link, forcing the user to tab through everything again.
 **Action:** Always wrap main content in a `<main id="main-content" tabindex="-1">` container when implementing skip links.
+
+## 2026-01-29 - [Toggle Button State & Visual Consistency]
+**Learning:** Using `aria-pressed` for toggle buttons (like "Wrap Text") is essential for screen reader users to understand current state, but it also creates a great hook for standardizing visual "active" states (like inset shadows) across a design system without custom classes. Persisting such display preferences ensures a continuous, personalized user experience.
+**Action:** Always use `aria-pressed` for on/off toggle buttons, bind a universal CSS rule to this attribute for visual feedback, and persist these micro-preferences in `localStorage` when they affect broad layout or readability.

@@ -237,22 +237,31 @@ button {
     background: var(--primary-strong);
 }
 
-#refreshBtn {
+#refreshBtn,
+#wrapTextBtn {
     background: var(--soft);
     color: #4a5568;
     border: 2px solid var(--accent);
     padding: 12px 18px;
 }
 
-#refreshBtn:hover:not(:disabled) {
+#refreshBtn:hover:not(:disabled),
+#wrapTextBtn:hover:not(:disabled) {
     background: var(--accent-soft);
     color: #2d3748;
     transform: translateY(-1px);
 }
 
-#refreshBtn:disabled {
+#refreshBtn:disabled,
+#wrapTextBtn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+}
+
+button[aria-pressed="true"] {
+    background: var(--accent-soft);
+    color: #2d3748;
+    box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.125);
 }
 
 /* Column toggle panel */
@@ -770,9 +779,12 @@ td {
     white-space: nowrap;
 }
 
-td.expanded {
+td.expanded,
+.wrap-text td {
     white-space: normal;
     word-wrap: break-word;
+    overflow: visible;
+    text-overflow: clip;
 }
 
 td:hover {
