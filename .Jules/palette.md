@@ -25,6 +25,19 @@
 **Learning:** Users appreciate when the application remembers their context (like selected sheet) after a reload. It reduces friction and makes the app feel smarter.
 **Action:** Use `localStorage` to persist transient user state (filters, selections) where appropriate, always validating the restored value against current available options.
 
+## 2026-01-23 - [Keyboard Navigation & Skip Links]
+**Learning:** Programmatically scrolling to the top (e.g., via a Skip Link) moves the viewport but not the keyboard focus, leaving the user navigating from their previous position.
+**Action:** Always move focus explicitly to the target element (using `tabindex="-1"` and `.focus()`) when implementing skip links or scroll-to-top buttons to ensure the keyboard sequence resets correctly.
 ## 2026-01-27 - [Skip Link Implementation]
 **Learning:** Adding a "Skip to Content" link requires ensuring the target container is programmatically focusable using `tabindex="-1"`. Without this, the browser scrolls but focus remains on the link, forcing the user to tab through everything again.
 **Action:** Always wrap main content in a `<main id="main-content" tabindex="-1">` container when implementing skip links.
+
+## 2026-02-05 - [Pagination Scroll Behavior]
+**Learning:** When paginating through long lists, maintaining the scroll position forces users to manually scroll up to see new content, creating friction.
+**Action:** Automatically scroll the results container to the top (`scrollIntoView({ block: 'start' })`) when navigating between pages to streamline the reading flow.
+## 2026-01-27 - [Focus Recovery on Destructive UI Changes]
+**Learning:** When interactive elements (like an empty state clear button) remove themselves from the DOM, focus falls back to the document body. This disrupts the navigation sequence for keyboard users.
+**Action:** Explicitly manage focus when replacing or destroying interactive UI components. Programmatically move focus to a logical next step (like a search input) to preserve a continuous, accessible flow.
+## 2026-03-08 - [Empty State Focus Recovery]
+**Learning:** When interactive elements (like a "Clear Search & Filters" button in an empty state) remove themselves from the DOM upon interaction, the browser drops keyboard focus back to the `document.body`. This forces keyboard users to tab back through the entire page header to get back to where they were.
+**Action:** When a button action results in its own destruction (e.g., clearing state), programmatically shift focus to the next logical element (like the search input) to preserve the user's flow.
