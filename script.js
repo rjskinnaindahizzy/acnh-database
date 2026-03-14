@@ -953,7 +953,11 @@ async function fetchSheetsBatch(sheetNames) {
     const ranges = data.valueRanges || [];
 
     for (const range of ranges) {
-        const sheetName = range.range.split('!')[0];
+        // The Sheets API wraps names containing spaces or special characters in
+        // single quotes (e.g. "'Tools/Goods'!A1:ZZ500"). Strip those quotes so
+        // the key in allSheetsData matches the raw sheet name used everywhere else.
+        const rawName = range.range.split('!')[0];
+        const sheetName = rawName.replace(/^'(.*)'$/, '$1');
         const rows = range.values || [];
         const headers = rows[0] || [];
         const dataRows = [];
@@ -1462,9 +1466,12 @@ async function applyFilters() {
                 });
             }
 
-            // Check if results come from multiple sheets
+            // Check if results come from multiple sheets.
+            // Always treat global-search results as multi-sheet so that
+            // setupHeadersForDisplay enters its isMultiSheet branch and
+            // sets headers — even when only one sheet has matches.
             const uniqueSheets = new Set(combinedData.map(row => row._sheet));
-            isMultiSheet = uniqueSheets.size > 1;
+            isMultiSheet = isGlobalSearch || uniqueSheets.size > 1;
 
             // Sort by sheet name to group results together
             if (isMultiSheet) {
